@@ -5,6 +5,7 @@ const devicesTableName = process.env.DEVICES_TABLE;
 const usersTableName = process.env.USERS_TABLE;
 const cipherTableName = process.env.CIPHERS_TABLE;
 const folderTableName = process.env.FOLDERS_TABLE;
+const twofactorTableName = process.env.TWOFACTOR_TABLE;
 
 // Bind internal dynogels logger to console, it supports warn/info/error as needed
 dynogels.log = console;
@@ -91,5 +92,20 @@ export const Folder = dynogels.define('Folder', {
     userUuid: Joi.string().required(),
     uuid: dynogels.types.uuid(), // Auto-generated
     name: Joi.string().required(),
+  },
+});
+
+export const Twofactor = dynogels.define('Twofactor', {
+  hashKey: 'userUuid',
+  timestamps: true,
+  tableName: twofactorTableName,
+
+  schema: {
+    userUuid: Joi.string().required(),
+    uuid: dynogels.types.uuid(), // Auto-generated
+    aType: Joi.number().allow(null),
+    enabled: Joi.boolean().allow(null),
+    data: Joi.string().allow(null),
+    lastUsed: Joi.string().allow(null),
   },
 });

@@ -4,7 +4,7 @@ service:
   # delete when removing the Cloudformation stack. It's better to risk
   # having a forgotten table running than losing data
   tableDeletionPolicy:
-    prod: Retain
+    prod: Delete
     other: Delete
 plugins:
   - serverless-webpack
@@ -20,6 +20,7 @@ provider:
     USERS_TABLE: ${self:service}-${self:provider.stage}-users
     CIPHERS_TABLE: ${self:service}-${self:provider.stage}-ciphers
     FOLDERS_TABLE: ${self:service}-${self:provider.stage}-folders
+    TWOFACTOR_TABLE: ${self:service}-${self:provider.stage}-twofactor
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -34,6 +35,7 @@ provider:
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CIPHERS_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.FOLDERS_TABLE}"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.TWOFACTOR_TABLE}"
   usagePlan:
     throttle:
       burstLimit: 300 # request burst
@@ -167,6 +169,27 @@ functions:
     handler: src/two_factor.setupHandler
   two_factor_complete:
     handler: src/two_factor.completeHandler
+  two_factor_get:
+    handler: src/two_factor.getHandler
+    events:
+      - http:
+          method: get
+          <<: *default_cors
+          path: api/two-factor
+  two_factor_get_authenticator:
+    handler: src/two_factor.getAuthenticatorHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-authenticator
+  two_factor_activate_authenticator:
+    handler: src/two_factor.activateAuthenticatorHandler
+    events:
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/authenticator
   import:
     handler: src/import.postHandler
     timeout: 30
@@ -260,6 +283,22 @@ resources:
             KeyType: HASH
           - AttributeName: uuid
             KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+    TwofactorTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
+      Properties:
+        TableName: ${self:provider.environment.TWOFACTOR_TABLE}
+        AttributeDefinitions:
+          - AttributeName: userUuid
+            AttributeType: S
+        KeySchema:
+          - AttributeName: userUuid
+            KeyType: HASH
         ProvisionedThroughput:
           ReadCapacityUnits: 1
           WriteCapacityUnits: 1
