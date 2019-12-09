@@ -1,8 +1,9 @@
 import querystring from 'querystring';
 import speakeasy from 'speakeasy';
 import * as utils from './lib/api_utils';
-import { User, Device } from './lib/models';
+import { User, Device, Twofactor } from './lib/models';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
+import { TwoFactorType } from './two_factor';
 
 export const handler = async (event, context, callback) => {
   console.log('Login handler triggered', JSON.stringify(event, null, 2));
@@ -58,12 +59,47 @@ export const handler = async (event, context, callback) => {
           return;
         }
 
-        if (user.get('totpSecret')) {
-          const verified = speakeasy.totp.verify({
-            secret: user.get('totpSecret'),
-            encoding: 'base32',
-            token: body.twofactortoken,
-          });
+        let twofactors = (await Twofactor.query(user.get('uuid')).execAsync()).Items;
+        let enabled = true;
+
+        if(twofactors && twofactors.length === 0) {
+          enabled = false;
+        }
+
+        if(enabled) {
+          let twofactorIds = twofactors.map(twofactor => twofactor.get('aType'));
+          let selectedId = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
+          
+          if(!body.twofactortoken) {
+            callback(null, {
+              statusCode: 400,
+              headers: utils.CORS_HEADERS,
+              body: JSON.stringify({
+                error: 'invalid_grant',
+                error_description: 'Two factor required.',
+                TwoFactorProviders: twofactorIds,
+                TwoFactorProviders2: { 0: null },
+              }),
+            });
+            return;
+          }
+
+          let selectedTwofactor = twofactors
+            .filter(twofactor => twofactor.get('aType') === selectedId && twofactor.get('enabled'))[0];
+          let selectedData = selectedTwofactor.get('data');
+          let remember = body.twofactoremember || 0;
+          let verified = false;
+
+          switch(selectedId) {
+            case TwoFactorType.Authenticator:
+              verified = speakeasy.totp.verify({
+                secret: selectedData,
+                encoding: 'base32',
+                token: body.twofactortoken,
+              });
+              break;
+                  // More two facto auth providers
+          }
 
           if (!verified) {
             callback(null, {
@@ -78,7 +114,30 @@ export const handler = async (event, context, callback) => {
             });
             return;
           }
+
         }
+
+        // if (user.get('totpSecret')) {
+        //   const verified = speakeasy.totp.verify({
+        //     secret: user.get('totpSecret'),
+        //     encoding: 'base32',
+        //     token: body.twofactortoken,
+        //   });
+
+        //   if (!verified) {
+        //     callback(null, {
+        //       statusCode: 400,
+        //       headers: utils.CORS_HEADERS,
+        //       body: JSON.stringify({
+        //         error: 'invalid_grant',
+        //         error_description: 'Two factor required.',
+        //         TwoFactorProviders: [0],
+        //         TwoFactorProviders2: { 0: null },
+        //       }),
+        //     });
+        //     return;
+        //   }
+        // }
 
         // Web vault doesn't send device identifier
         if (body.deviceidentifier) {

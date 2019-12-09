@@ -4,7 +4,7 @@ import { User, Twofactor } from './lib/models';
 import { loadContextFromHeader, hashesMatch } from './lib/bitwarden';
 import * as utils from './lib/api_utils';
 
-const TwoFactorType = {
+export const TwoFactorType = {
   Authenticator: 0,
   Email: 1,
   Duo: 2,
