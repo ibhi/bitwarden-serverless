@@ -1,5 +1,6 @@
 import dynogels from 'dynogels-promisified';
 import Joi from '@hapi/joi';
+import { Model } from 'dynogels';
 
 const devicesTableName = process.env.DEVICES_TABLE;
 const usersTableName = process.env.USERS_TABLE;
@@ -53,6 +54,7 @@ export const User = dynogels.define('User', {
     culture: Joi.string(),
     kdfIterations: Joi.number().min(5000).max(1e6),
     version: Joi.number().allow(null),
+    recoveryCode: Joi.string().allow(null),
   },
 });
 
@@ -95,7 +97,7 @@ export const Folder = dynogels.define('Folder', {
   },
 });
 
-export const Twofactor = dynogels.define('Twofactor', {
+export const Twofactor: Model = dynogels.define('Twofactor', {
   hashKey: 'userUuid',
   timestamps: true,
   tableName: twofactorTableName,

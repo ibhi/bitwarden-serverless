@@ -8,6 +8,29 @@ import {
 } from './models';
 import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
 
+// Types
+
+interface Tokens {
+  tokenExpiresAt: Date;
+  refreshToken: string;
+  accessToken?: string;
+}
+
+interface JwtPayload {
+  nbf: number;
+  exp: number;
+  iss: string;
+  sub: string;
+  premium: string;
+  name: string;
+  email: string;
+  email_verified: string;
+  sstamp: string;
+  device: string;
+  scope: string[];
+  amr: string[];
+}
+
 const JWT_DEFAULT_ALGORITHM = 'HS256';
 
 export const TYPE_LOGIN = 1;
@@ -22,8 +45,8 @@ export async function loadContextFromHeader(header) {
     throw new Error('Missing Authorization header');
   }
 
-  const token = header.replace(/^(Bearer)/, '').trim();
-  const payload = jwt.decode(token);
+  const token: string = header.replace(/^(Bearer)/, '').trim();
+  const payload: JwtPayload = jwt.decode(token) as JwtPayload;
   const userUuid = payload.sub;
   const deviceUuid = payload.device;
   const user = await User.getAsync(userUuid);
@@ -50,16 +73,17 @@ export function regenerateTokens(user, device) {
   const notBeforeDate = new Date();
   notBeforeDate.setTime(notBeforeDate.getTime() - (60 * 2 * 1000));
 
-  const tokens = {
+  const tokens: Tokens = {
     tokenExpiresAt: expiryDate,
     refreshToken: device.get('refreshToken'),
+    accessToken: undefined
   };
 
   if (!device.get('refreshToken')) {
     tokens.refreshToken = generateToken();
   }
 
-  const payload = {
+  const payload: JwtPayload = {
     nbf: Math.floor(notBeforeDate.getTime() / 1000),
     exp: Math.floor(expiryDate.getTime() / 1000),
     iss: '/identity',
@@ -96,7 +120,7 @@ export function buildCipherDocument(body, user) {
     version: CIPHER_MODEL_VERSION,
   };
 
-  let additionalParamsType = null;
+  let additionalParamsType;
   if (params.type === TYPE_LOGIN) {
     additionalParamsType = 'login';
   } else if (params.type === TYPE_CARD) {

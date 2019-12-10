@@ -6,6 +6,8 @@ service:
   tableDeletionPolicy:
     prod: Delete
     other: Delete
+# package:
+#   individually: true
 plugins:
   - serverless-webpack
 
@@ -176,6 +178,17 @@ functions:
           method: get
           <<: *default_cors
           path: api/two-factor
+  two_factor_disable:
+    handler: src/two_factor.disableTwofactorHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/disable
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/disable
   two_factor_get_authenticator:
     handler: src/two_factor.getAuthenticatorHandler
     events:
@@ -190,6 +203,27 @@ functions:
           method: put
           <<: *default_cors
           path: api/two-factor/authenticator
+  two_factor_get_recover:
+    handler: src/two_factor.getRecoveryCode
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-recover
+  two_factor_recover:
+    handler: src/two_factor.recover
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/recover
+  two_factor_getu2f:
+    handler: src/two_factor.getU2f
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-u2f
   import:
     handler: src/import.postHandler
     timeout: 30
@@ -212,7 +246,10 @@ functions:
           <<: *default_cors
           path: /{fallback+}
 
-
+custom:
+  webpack:
+    webpackConfig: 'webpack.config.js'
+    includeModules: true
 
 resources:
   Resources:
@@ -304,3 +341,4 @@ resources:
           WriteCapacityUnits: 1
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
+ 

@@ -3,7 +3,7 @@
  * The API accepts any case and clients actually send a mix
  * For compatibility, we just use lowercase everywhere
  */
-export function normalizeBody(body) {
+export function normalizeBody(body): any {
   const normalized = {};
   Object.keys(body).forEach((key) => {
     normalized[key.toLowerCase()] = body[key];
