@@ -6,11 +6,15 @@ service:
   tableDeletionPolicy:
     prod: Delete
     other: Delete
-# package:
-#   individually: true
+package:
+  individually: true
 plugins:
   - serverless-webpack
-
+custom:
+  webpack:
+    webpackConfig: 'webpack.config.js'
+#     includeModules: true
+    keepOutputDirectory: true
 provider:
   name: aws
   stage: ${opt:stage, 'prod'}
@@ -163,14 +167,14 @@ functions:
           method: delete
           <<: *default_cors
           path: api/folders/{uuid}
-  migrate:
-    handler: src/migrate.migrateHandler
-    timeout: 300
-    memorySize: 1024
-  two_factor_setup:
-    handler: src/two_factor.setupHandler
-  two_factor_complete:
-    handler: src/two_factor.completeHandler
+  # migrate:
+  #   handler: src/migrate.migrateHandler
+  #   timeout: 300
+  #   memorySize: 1024
+  # two_factor_setup:
+  #   handler: src/two_factor.setupHandler
+  # two_factor_complete:
+  #   handler: src/two_factor.completeHandler
   two_factor_get:
     handler: src/two_factor.getHandler
     events:
@@ -224,6 +228,24 @@ functions:
           method: post
           <<: *default_cors
           path: api/two-factor/get-u2f
+  two_factor_getu2f_challenge:
+    handler: src/two_factor.generateU2fChallenge
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-u2f-challenge
+  two_factor_u2f:
+    handler: src/two_factor.activateU2f
+    events:
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/u2f
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/u2f
   import:
     handler: src/import.postHandler
     timeout: 30
@@ -245,11 +267,6 @@ functions:
           method: any
           <<: *default_cors
           path: /{fallback+}
-
-custom:
-  webpack:
-    webpackConfig: 'webpack.config.js'
-    includeModules: true
 
 resources:
   Resources:

@@ -7,6 +7,9 @@ export enum TwoFactorType {
     U2f = 4,
     Remember = 5,
     OrganizationDuo = 6,
+    U2fRegisterChallenge = 1000,
+    U2fLoginChallenge = 1001,
+    EmailVerificationChallenge = 1002,
 }
 
 export interface GetTwofactorResponse {

@@ -1,14 +1,19 @@
 import { Twofactor, User } from './lib/models';
-import { loadContextFromHeader, hashesMatch } from './lib/bitwarden';
+import { loadContextFromHeader, hashesMatch, regenerateTokens } from './lib/bitwarden';
 import * as utils from './lib/api_utils';
 import { AuthenticatorProvider } from './twofactor/providers/authenticator-provider';
 import { decode } from 'hi-base32';
 import { GetAuthenticatorResponse, TwoFactorType } from './twofactor/models';
 import { GenericTwofactorProvider } from './twofactor/generic-twofactor-provider';
-import { Item } from 'dynogels';
+import { Item, reset } from 'dynogels';
+import * as u2f from 'u2f';
 
 const authenticatorProvider = new AuthenticatorProvider();
 const genericTwofactorProvider = new GenericTwofactorProvider();
+
+// Todo: make it configurable by the developer
+const APP_ID = 'https://localhost:8080';
+const U2F_VERSION = 'U2F_V2';
 
 // /two-factor GET
 export const getHandler = async (event, context, callback) => {
@@ -348,4 +353,209 @@ export const getU2f = async (event, context, callback) => {
     return;
   }
 // Todo: handle u2f registrations already exists scenario
+}
+
+// /two-factor/get-u2f-challenge POST
+export const generateU2fChallenge = async (event, context, callback) => {
+  console.log('2FA get u2f handler triggered', JSON.stringify(event, null, 2));
+
+  if (!event.body) {
+    callback(null, utils.validationError('Missing request body'));
+    return;
+  }
+
+  const body: GetU2fData = utils.normalizeBody(JSON.parse(event.body));
+
+  let user;
+  try {
+    ({ user } = await loadContextFromHeader(event.headers.Authorization));
+    console.log('User uuid ' + user.get('uuid'));
+  } catch (e) {
+    callback(null, utils.validationError('User not found: ' + e.message));
+    return;
+  }
+
+  if (!hashesMatch(user.get('passwordHash'), body.masterpasswordhash)) {
+    callback(null, utils.validationError('Invalid username or password'));
+    return;
+  }
+
+  try {
+    const challengeResponse = u2f.request(APP_ID);
+
+    await Twofactor.createAsync({
+      userUuid: user.get('uuid'),
+      aType: TwoFactorType.U2fRegisterChallenge,
+      enabled: true,
+      data: JSON.stringify(challengeResponse)
+    });
+
+    const result = {
+      UserId: user.get('uuid'),
+      AppId: APP_ID,
+      Challenge: challengeResponse.challenge,
+      Version: U2F_VERSION,
+    }
+
+    callback(null, utils.okResponse(result));
+    return;
+  } catch(error) {
+    callback(null, utils.serverError('Error saving challenge', error));
+    return;
+  }
+
+}
+
+interface EnableU2FData {
+  id: number | string;
+  // 1..5
+  name: string;
+  masterpasswordhash: string;
+  deviceresponse: string;
+}
+
+interface DeviceResponse {
+  clientData: string;
+  errorCode: number;
+  registrationData: string;
+  version: string;
+}
+
+interface Challange {
+  appId: string;
+  challenge: string;
+  version: string
+}
+
+interface RegistrationCheckResponse {
+  successful: boolean;
+  publicKey: string;
+  keyHandle: string;
+  certificate: string;
+  errorMessage?: string;
+}
+
+interface Registration {
+  pubKey: string;
+  keyHandle: string;
+  attestationCert: string;
+}
+
+interface U2FRegistration {
+  id: string | number;
+  name: string;
+  reg: Registration;
+  counter: number;
+  compromised: boolean;
+}
+
+const getU2fRegistrations = async(userUuid: string) => {
+  
+}
+
+
+// /two-factor/u2f POST
+export const activateU2f = async (event, context, callback) => {
+  console.log('2FA get u2f handler triggered', JSON.stringify(event, null, 2));
+
+  if (!event.body) {
+    callback(null, utils.validationError('Missing request body'));
+    return;
+  }
+
+  const body: EnableU2FData = utils.normalizeBody(JSON.parse(event.body));
+
+  let user;
+  try {
+    ({ user } = await loadContextFromHeader(event.headers.Authorization));
+    console.log('User uuid ' + user.get('uuid'));
+  } catch (e) {
+    callback(null, utils.validationError('User not found: ' + e.message));
+    return;
+  }
+
+  if (!hashesMatch(user.get('passwordHash'), body.masterpasswordhash)) {
+    callback(null, utils.validationError('Invalid username or password'));
+    return;
+  }
+
+  let challenge: Challange;
+
+  try {
+    const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2fRegisterChallenge);
+    challenge = JSON.parse(twofactor.get('data'));
+    await twofactor.destroyAsync();
+  } catch (error) {
+    callback(null, utils.serverError('Error: Cant recover challenge', error));
+    return;
+  }
+  console.log(`Device response before parsing ${body.deviceresponse}`)
+  const deviceResponse: DeviceResponse = JSON.parse(body.deviceresponse);
+  console.log(`Device response after parsing ${deviceResponse}`)
+  if(deviceResponse.errorCode !== 0) {
+    callback(null, utils.validationError("Error registering U2F token"));
+    return;
+  }
+
+  try {
+    const registration: RegistrationCheckResponse = u2f.checkRegistration(challenge, deviceResponse);
+    console.log('Check registration response ' + JSON.stringify(registration));
+    if(registration && registration.errorMessage) {
+      throw Error('Verification of challange failed!');
+    }
+
+    if(registration.successful) {
+      // Create new full registration (U2FRegsitration) object
+      const reg: Registration = {
+        pubKey: registration.publicKey,
+        keyHandle: registration.keyHandle,
+        attestationCert: registration.certificate
+      };
+      const fullRegistration: U2FRegistration = {
+        id: body.id,
+        name: body.name,
+        reg: reg,
+        compromised: false,
+        counter: 0
+      }
+      // Get existing u2f twofactor record from DB
+      const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2f);
+      // Parse the data field to array of U2FRegistration
+      let regs: U2FRegistration[]
+      if(twofactor && twofactor.get('data')) {
+        regs = JSON.parse(twofactor.get('data'))
+      } else {
+        regs = []
+      }
+      // Push the new registration data to the existing array
+      regs.push(fullRegistration);
+      // Update the twofactor record
+      await Twofactor.updateAsync({
+        userUuid: user.get('uuid'),
+        enabled: true,
+        data: JSON.stringify(regs),
+        aType: TwoFactorType.U2f
+      });
+      // generate recovery code 
+      await genericTwofactorProvider.generateRecoverCode(user);
+      // prepare the json response
+      const keys = regs.map(reg => ({
+        Id: reg.id,
+        Name: reg.name,
+        Compromised: reg.compromised
+      }));
+
+      const result = {
+        Enabled: true,
+        Keys: keys,
+        Object: "twoFactorU2f"
+      }
+      callback(null, utils.okResponse(result));
+      return;
+    }
+    
+  } catch (error) {
+    callback(null, utils.validationError("Error validating U2F token"));
+    return;
+  }
 }

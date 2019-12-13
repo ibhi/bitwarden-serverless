@@ -12,6 +12,7 @@ declare module 'dynogels' {
     interface Model {
         createAsync(item: any): Promise<Item>;
         destroyAsync(hashKey: any): Promise<Item>;
+        updateAsync(item: any): Promise<Item>;
     }
 
     interface Item {
