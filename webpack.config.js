@@ -22,21 +22,37 @@ module.exports = {
   target: 'node',
   module: {
     rules: [
+      // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
       {
-        // Include ts, tsx, js, and jsx files.
-        test: /\.(ts|js)x?$/,
-        exclude: /node_modules/,
-        use: [
-          {
-            loader: 'cache-loader',
-            options: {
-              cacheDirectory: path.resolve('.webpackCache')
-            }
+        test: /\.(tsx?)$/,
+        // loader: 'ts-loader',
+        exclude: [
+          [
+            path.resolve(__dirname, 'node_modules'),
+            path.resolve(__dirname, '.serverless'),
+            path.resolve(__dirname, '.webpack'),
+          ],
+        ],
+        use: [{
+          loader: 'ts-loader',
+          options: {
+            transpileOnly: true,
+            experimentalWatchApi: true,
           },
-          'babel-loader',
-          // 'ts-loader'
-        ]
-      }
+        }, {
+              loader: 'cache-loader',
+              options: {
+                cacheDirectory: path.resolve('.webpackCache')
+              }
+          },
+        ],
+        
+      },
+      {
+        test: /test\.ts$/,
+        use: ['ts-loader', 'mocha-loader'],
+        exclude: /node_modules/,
+      },
     ]
   },
   plugins: [new ForkTsCheckerWebpackPlugin()]

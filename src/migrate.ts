@@ -52,7 +52,7 @@ export const migrateHandler = async (event, context, callback) => {
         break;
       default: {
         cipherCount += 1;
-        const fields = {
+        const fields: any = {
           version: 1,
         };
         const data = cipher.get('data');

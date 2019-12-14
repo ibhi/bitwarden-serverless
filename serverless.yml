@@ -6,15 +6,15 @@ service:
   tableDeletionPolicy:
     prod: Delete
     other: Delete
-package:
-  individually: true
+# package:
+#   individually: true
 plugins:
   - serverless-webpack
 custom:
   webpack:
     webpackConfig: 'webpack.config.js'
-#     includeModules: true
-    keepOutputDirectory: true
+    includeModules: true
+    # keepOutputDirectory: true
 provider:
   name: aws
   stage: ${opt:stage, 'prod'}

@@ -1,5 +1,7 @@
+import _ from 'lodash';
+
 var chakram = require('chakram');
-var _ = require('lodash');
+// var _ = require('lodash');
 var expect = chakram.expect;
 
 describe("Registration API", function () {

@@ -72,7 +72,7 @@ describe('Bitwarden cipher format', function() {
     const key = await bitwardenCrypto.makeKeyAsync('foo', 'bar');
     const cipher = crypto.createCipheriv('AES-256-CBC', key, iv);
     const ciphertext = Buffer.concat([
-      cipher.update(plaintext, 'utf8'),
+      cipher.update(plaintext),
       cipher.final(),
     ]);
     const cipherString = new bitwardenCrypto.CipherString(

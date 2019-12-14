@@ -1,6 +1,8 @@
+import _ from 'lodash';
+
 var chakram = require('chakram');
 var jwt = require('jsonwebtoken');
-var _ = require('lodash');
+// var _ = require('lodash');
 var expect = chakram.expect;
 
 describe("Login API", function () {
@@ -43,11 +45,11 @@ describe("Login API", function () {
     };
   }
 
-  function getRefreshTokenBody(token) {
+  function getRefreshTokenBody(token = '') {
     return {
       "grant_type": "refresh_token",
       "client_id": "browser",
-      "refresh_token": (token || ""),
+      "refresh_token": (token),
     };
   }
 

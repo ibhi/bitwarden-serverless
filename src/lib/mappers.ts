@@ -1,4 +1,6 @@
-export function mapCipher(cipher) {
+import { Item } from "dynogels";
+
+export function mapCipher(cipher: Item) {
   return {
     Id: cipher.get('uuid'),
     Type: cipher.get('type'),
@@ -20,7 +22,7 @@ export function mapCipher(cipher) {
   };
 }
 
-export function mapUser(user) {
+export function mapUser(user: Item) {
   return {
     Id: user.get('uuid'),
     Name: user.get('name'),
@@ -38,7 +40,7 @@ export function mapUser(user) {
   };
 }
 
-export function mapFolder(folder) {
+export function mapFolder(folder: Item) {
   return {
     Id: folder.get('uuid'),
     Name: folder.get('name'),

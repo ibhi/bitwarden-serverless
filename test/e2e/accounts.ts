@@ -1,5 +1,8 @@
+import { LoDashStatic } from "lodash";
+import _ from 'lodash';
+
 var chakram = require('chakram');
-var _ = require('lodash');
+// var _: LoDashStatic = require('lodash');
 var expect = chakram.expect;
 
 describe("Accounts API", function () {

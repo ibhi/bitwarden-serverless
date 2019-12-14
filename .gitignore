@@ -8,3 +8,7 @@ jspm_packages
 # Webpack directories
 .webpack
 .webpackCache
+
+# Code coverage
+.nyc_output
+coverage

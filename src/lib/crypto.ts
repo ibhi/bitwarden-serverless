@@ -18,11 +18,11 @@ export const KDF_PBKDF2_ITERATIONS_MAX = 1000000;
  * Bitwarden format of storing ciphers
  */
 export class CipherString {
-  constructor(type, iv, ciphertext, mac = null) {
-    this.type = type;
-    this.iv = iv;
-    this.ciphertext = ciphertext;
-    this.mac = mac;
+  constructor(public type: string | number, public iv: string, public ciphertext: string, public mac: string | null = null) {
+    // this.type = type;
+    // this.iv = iv;
+    // this.ciphertext = ciphertext;
+    // this.mac = mac;
   }
 
   static fromString(string) {
@@ -52,7 +52,7 @@ export async function makeKeyAsync(
   kdf = KDF_PBKDF2,
   iterations = KDF_PBKDF2_ITERATIONS_DEFAULT,
 ) {
-  return new Promise((resolve, reject) => {
+  return new Promise<Buffer>((resolve, reject) => {
     switch (kdf) {
       case KDF_PBKDF2:
         if (iterations < KDF_PBKDF2_ITERATIONS_MIN || iterations > KDF_PBKDF2_ITERATIONS_MAX) {
@@ -80,7 +80,7 @@ export function makeEncryptionKey(key) {
   const cipher = crypto.createCipheriv('AES-256-CBC', key, iv);
 
   const ciphertext = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
+    cipher.update(plaintext),
     cipher.final(),
   ]);
 
@@ -114,7 +114,7 @@ export async function hashPasswordAsync(
 
 export function encryptWithMasterPasswordKey(data, userKey, masterKey) {
   // Decrypt the encrypted key stored on the user table to get the user key
-  const encKey = Buffer.from(decrypt(userKey, masterKey), 'utf-8');
+  const encKey = Buffer.from(decrypt(userKey, masterKey));
 
   return encrypt(data.toString(), encKey);
 }

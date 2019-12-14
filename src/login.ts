@@ -3,7 +3,7 @@ import speakeasy from 'speakeasy';
 import * as utils from './lib/api_utils';
 import { User, Device, Twofactor } from './lib/models';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
-import { TwoFactorType } from './two_factor';
+import { TwoFactorType } from './twofactor/models';
 
 export const handler = async (event, context, callback) => {
   console.log('Login handler triggered', JSON.stringify(event, null, 2));

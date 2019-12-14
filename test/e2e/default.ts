@@ -1,3 +1,4 @@
+import _ from 'lodash';
 var chakram = require('chakram');
 var expect = chakram.expect;
 

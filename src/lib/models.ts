@@ -16,7 +16,7 @@ dynogels.log = console;
 export const CIPHER_MODEL_VERSION = 1;
 export const USER_MODEL_VERSION = 2;
 
-export const Device = dynogels.define('Device', {
+export const Device: Model = dynogels.define('Device', {
   hashKey: 'uuid',
   timestamps: true,
   tableName: devicesTableName,
@@ -58,7 +58,7 @@ export const User = dynogels.define('User', {
   },
 });
 
-export const Cipher = dynogels.define('Cipher', {
+export const Cipher: Model = dynogels.define('Cipher', {
   hashKey: 'userUuid',
   rangeKey: 'uuid',
   timestamps: true,

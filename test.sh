@@ -16,3 +16,4 @@ serverless deploy --stage ${STAGE}
 API_URL=$(serverless info --stage ${STAGE} --verbose | grep ServiceEndpoint | cut -d":" -f2- | xargs) \
   node_modules/.bin/mocha --timeout 10000 --require mocha-steps --require "@babel/register" --colors test/*
 
+# node_modules/.bin/mocha-webpack "test/unit/crypto.ts" --webpack-config webpack.config-test.js

@@ -171,8 +171,6 @@ export const recover = async (event, context, callback) => {
     return;
   }
 
-  console.log(`Recovery code in database: ${user.get('recoveryCode').toLowerCase()}`);
-  console.log(`Recovery code from request ${body.recoverycode}`);
   // Check if recovery code is correct
   if(user.get('recoveryCode').toLowerCase() !== body.recoverycode) {
     callback(null, utils.validationError('Recovery code is incorrect. Try again.'));

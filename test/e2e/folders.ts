@@ -1,6 +1,8 @@
+import _ from 'lodash';
+
 var chakram = require('chakram');
 var jwt = require('jsonwebtoken');
-var _ = require('lodash');
+// var _ = require('lodash');
 var helpers = require('../helpers');
 var expect = chakram.expect;
 
@@ -57,7 +59,7 @@ describe("Folders API", function () {
   describe('folder manipulation', function() {
     var folderId;
 
-    step('allows create', function() {
+    it('allows create', function() {
       var name = "2.FQAwIBaDbczEGnEJw4g4hw==|7KreXaC0duAj0ulzZJ8ncA==|nu2sEvotjd4zusvGF8YZJPnS9SiJPDqc1VIfCrfve/o=";
       return chakram.post(
         process.env.API_URL + "/api/folders",
@@ -74,7 +76,7 @@ describe("Folders API", function () {
       });
     });
 
-    step('allows editing', function() {
+    it('allows editing', function() {
       var newName = "2.JbFkAEZPnuMm70cdP44wtA==|fsN6nbT+udGmOWv8K4otgw==|JbtwmNQa7/48KszT2hAdxpmJ6DRPZst0EDEZx5GzesI=";
       return chakram.put(
         process.env.API_URL + "/api/folders/" + folderId,
@@ -89,7 +91,7 @@ describe("Folders API", function () {
       });
     });
 
-    step('errors when editing non-existent folder', function() {
+    it('errors when editing non-existent folder', function() {
       var newName = "2.JbFkAEZPnuMm70cdP44wtA==|fsN6nbT+udGmOWv8K4otgw==|JbtwmNQa7/48KszT2hAdxpmJ6DRPZst0EDEZx5GzesI=";
       return chakram.put(
         process.env.API_URL + "/api/folders/foobar",
@@ -100,7 +102,7 @@ describe("Folders API", function () {
       });
     });
 
-    step('allows delete', function() {
+    it('allows delete', function() {
       return chakram.delete(
         process.env.API_URL + "/api/folders/" + folderId,
         null,
@@ -110,7 +112,7 @@ describe("Folders API", function () {
       });
     });
 
-    step('doesn\'t allow editing deleted folder', function() {
+    it('doesn\'t allow editing deleted folder', function() {
       var newName = "2.JbFkAEZPnuMm70cdP44wtA==|fsN6nbT+udGmOWv8K4otgw==|JbtwmNQa7/48KszT2hAdxpmJ6DRPZst0EDEZx5GzesI=";
       return chakram.put(
         process.env.API_URL + "/api/folders/" + folderId,

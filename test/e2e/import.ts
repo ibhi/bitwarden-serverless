@@ -1,6 +1,8 @@
+import _ from 'lodash';
+
 var chakram = require('chakram');
 var jwt = require('jsonwebtoken');
-var _ = require('lodash');
+// var _ = require('lodash');
 var helpers = require('../helpers');
 var expect = chakram.expect;
 

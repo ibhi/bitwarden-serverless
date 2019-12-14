@@ -1,21 +1,23 @@
 import * as utils from './lib/api_utils';
 import { loadContextFromHeader } from './lib/bitwarden';
 import { getRevisionDateAsMillis, mapUser } from './lib/mappers';
+import { Item } from 'dynogels';
 
 export const profileHandler = async (event, context, callback) => {
   console.log('Account profile handler triggered', JSON.stringify(event, null, 2));
 
-  let user;
+  let user: Item;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
+    return;
   }
 
   try {
     callback(null, utils.okResponse(mapUser(user)));
   } catch (e) {
-    callback(null, utils.serverError(e.toString()));
+    callback(null, utils.serverError('Error: ', e));
   }
 };
 
@@ -42,7 +44,7 @@ export const putProfileHandler = async (event, context, callback) => {
 
     callback(null, utils.okResponse(mapUser(user)));
   } catch (e) {
-    callback(null, utils.serverError(e.toString()));
+    callback(null, utils.serverError('Error: ', e));
   }
 };
 
@@ -65,6 +67,6 @@ export const revisionDateHandler = async (event, context, callback) => {
       body: getRevisionDateAsMillis(user),
     });
   } catch (e) {
-    callback(null, utils.serverError(e.toString()));
+    callback(null, utils.serverError('Error: ', e));
   }
 };

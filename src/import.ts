@@ -5,16 +5,16 @@ import { loadContextFromHeader, buildCipherDocument, touch } from './lib/bitward
 const MAX_RETRIES = 4;
 
 const resolveHandler = async (promiseList, user, fcb) => {
-  const output = [];
+  const output: string[] = [];
   let retryCount = 0;
   let failedPromises = promiseList;
   while (failedPromises.length > 0 && retryCount < MAX_RETRIES) {
     retryCount += 1;
     failedPromises = await Promise.all(failedPromises) // eslint-disable-line
       .then((results) => {
-        const toRetry = [];
+        const toRetry: any[] = [];
         for (let i = 0; i < results.length; i += 1) {
-          const res = results[i];
+          const res: any = results[i];
           if (!res.success) {
             output.push('ERR: ' + res.code);
             console.error('ERR: ' + res.code);
@@ -113,7 +113,7 @@ export const postHandler = async (event, context, callback) => {
       .catch(error => ({ success: false, error, model: cipher }))
   );
 
-  const cipherPromises = [];
+  const cipherPromises: any[] = [];
   for (let i = 0; i < body.ciphers.length; i += 1) {
     const cipher = buildCipherDocument(normalizeBody(body.ciphers[i]), user);
     const destFolder = body.folderrelationships.filter(fr => fr.key === i);

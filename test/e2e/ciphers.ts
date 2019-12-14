@@ -1,7 +1,9 @@
+import _ from 'lodash';
+
 var chakram = require('chakram');
 var helpers = require('../helpers');
 var jwt = require('jsonwebtoken');
-var _ = require('lodash');
+// var _ = require('lodash');
 var expect = chakram.expect;
 
 describe("Cipher API", function () {
@@ -63,7 +65,7 @@ describe("Cipher API", function () {
     var cipherId;
     var revisionDate;
 
-    step('allows create', function() {
+    it('allows create', function() {
       var cipherBody = getCipherBody();
 
       return chakram.post(
@@ -84,7 +86,7 @@ describe("Cipher API", function () {
       });
     });
 
-    step('allows editing', function() {
+    it('allows editing', function() {
       var cipherBody = getCipherBody();
       cipherBody.favorite = !cipherBody.favorite;
 
@@ -103,7 +105,7 @@ describe("Cipher API", function () {
       });
     });
 
-    step('errors when editing non-existent folder', function() {
+    it('errors when editing non-existent folder', function() {
       return chakram.put(
         process.env.API_URL + "/api/ciphers/foobar",
         getCipherBody(),
@@ -113,7 +115,7 @@ describe("Cipher API", function () {
       });
     });
 
-    step('allows delete', function() {
+    it('allows delete', function() {
       return chakram.delete(
         process.env.API_URL + "/api/ciphers/" + cipherId,
         null,
@@ -123,7 +125,7 @@ describe("Cipher API", function () {
       });
     });
 
-    step('doesn\'t allow editing deleted folder', function() {
+    it('doesn\'t allow editing deleted folder', function() {
       return chakram.put(
         process.env.API_URL + "/api/folders/" + cipherId,
         getCipherBody(),
