@@ -86,4 +86,45 @@ export const Device: Model = dynogels.define('Device', {
     indexes: [{
         hashKey: 'refreshToken', name: 'RefreshTokenDeviceIndex', type: 'global'
     }]
+});
+
+export const Cipher: Model = dynogels.define('Cipher', {
+    hashKey: 'pk',
+    rangeKey: 'sk',
+    timestamps: true,
+    tableName: usersTableName,
+  
+    schema: {
+        //USER#UUID 
+        pk: Joi.string().required(),
+        // #CIPHER#UUID
+        sk: Joi.string().required(),
+        folderUuid: Joi.string().allow(null),
+        organizationUuid: Joi.string().allow(null),
+        type: Joi.number(),
+        version: Joi.number().allow(null),
+        data: Joi.object().allow(null),
+        favorite: Joi.boolean(),
+        attachments: Joi.any().allow(null),
+        name: Joi.string().allow(null),
+        notes: Joi.string().allow(null),
+        fields: Joi.any().allow(null),
+        login: Joi.object().allow(null),
+        securenote: Joi.object().allow(null),
+        identity: Joi.object().allow(null),
+        card: Joi.object().allow(null),
+    },
+  });
+
+  export const Folder: Model = dynogels.define('Folder', {
+    hashKey: 'pk',
+    rangeKey: 'sk',
+    timestamps: true,
+    tableName: usersTableName,
+  
+    schema: {
+      pk: Joi.string().required(),
+      sk: Joi.string().required(), // Auto-generated
+      name: Joi.string().required(),
+    },
   });

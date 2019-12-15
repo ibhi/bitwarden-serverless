@@ -7,6 +7,10 @@ import {
   User, Device, CIPHER_MODEL_VERSION, USER_MODEL_VERSION,
 } from './models';
 import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
+import { userRepository } from '../db/user-repository';
+import { deviceRepository, DeviceRepository } from '../db/device-repository';
+import { CipherRepository } from '../db/cipher-repository';
+import { v4 as uuidV4 } from 'uuid';
 
 // Types
 
@@ -38,6 +42,7 @@ export const TYPE_NOTE = 2;
 export const TYPE_CARD = 3;
 export const TYPE_IDENTITY = 4;
 
+
 export const DEFAULT_VALIDITY = 60 * 60;
 
 export async function loadContextFromHeader(header) {
@@ -49,8 +54,8 @@ export async function loadContextFromHeader(header) {
   const payload: JwtPayload = jwt.decode(token) as JwtPayload;
   const userUuid = payload.sub;
   const deviceUuid = payload.device;
-  const user = await User.getAsync(userUuid);
-  const device = await Device.getAsync(deviceUuid);
+  const user = await userRepository.getUserById(userUuid);
+  const device = await deviceRepository.getDeviceById(userUuid, deviceUuid);
 
   if (!user || !device) {
     throw new Error('User or device not found from token');
@@ -87,13 +92,14 @@ export function regenerateTokens(user, device) {
     nbf: Math.floor(notBeforeDate.getTime() / 1000),
     exp: Math.floor(expiryDate.getTime() / 1000),
     iss: '/identity',
-    sub: user.get('uuid'),
+    sub: user.get('pk'),
     premium: user.get('premium'),
     name: user.get('name'),
     email: user.get('email'),
     email_verified: user.get('emailVerified'),
     sstamp: user.get('securityStamp'),
-    device: device.get('uuid'),
+    // Stripping the prefix from db
+    device: device.get('sk').substring(DeviceRepository.DEVICE_PREFIX.length),
     scope: ['api', 'offline_access'],
     amr: ['Application'],
   };
@@ -107,9 +113,10 @@ export function hashesMatch(hashA, hashB) {
   return hashA && hashB && bufferEq(Buffer.from(hashA), Buffer.from(hashB));
 }
 
-export function buildCipherDocument(body, user) {
+export function buildCipherDocument(body, user, cipherId) {
   const params = {
-    userUuid: user.get('uuid'),
+    pk: user.get('pk'),
+    sk: cipherId ? cipherId :`${CipherRepository.CIPHER_PREFIX}${uuidV4()}`,
     organizationUuid: body.organizationid,
     folderUuid: body.folderid,
     favorite: !!body.favorite,

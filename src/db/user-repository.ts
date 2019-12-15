@@ -11,7 +11,9 @@ export interface Twofactor {
 
 export class UserRepository {
 
-    createUser(user: Item): Promise<Item> {
+    static USER_PREFIX = 'USER::';
+
+    createUser(user: any): Promise<Item> {
         return User.createAsync(user);
     }
 
@@ -50,4 +52,7 @@ export class UserRepository {
             sk: userUuid,
         }, params);
     }
+
 }
+
+export const userRepository = new UserRepository();

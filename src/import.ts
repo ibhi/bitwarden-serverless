@@ -115,7 +115,7 @@ export const postHandler = async (event, context, callback) => {
 
   const cipherPromises: any[] = [];
   for (let i = 0; i < body.ciphers.length; i += 1) {
-    const cipher = buildCipherDocument(normalizeBody(body.ciphers[i]), user);
+    const cipher = buildCipherDocument(normalizeBody(body.ciphers[i]), user, null);
     const destFolder = body.folderrelationships.filter(fr => fr.key === i);
     if (destFolder.length === 1) {
       const whichFolder = destFolder[0].value;

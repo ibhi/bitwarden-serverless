@@ -1,7 +1,7 @@
 import * as utils from './lib/api_utils';
 import { loadContextFromHeader, buildCipherDocument, touch } from './lib/bitwarden';
 import { mapCipher } from './lib/mappers';
-import { Cipher } from './lib/models';
+import { cipherRepository } from './db/cipher-repository';
 
 export const postHandler = async (event, context, callback) => {
   console.log('Cipher create handler triggered', JSON.stringify(event, null, 2));
@@ -27,7 +27,7 @@ export const postHandler = async (event, context, callback) => {
   }
 
   try {
-    const cipher = await Cipher.createAsync(buildCipherDocument(body, user));
+    const cipher = await cipherRepository.createCipher(buildCipherDocument(body, user, null));
 
     await touch(user);
 
@@ -65,14 +65,14 @@ export const putHandler = async (event, context, callback) => {
   }
 
   try {
-    let cipher = await Cipher.getAsync(user.get('uuid'), cipherUuid);
+    let cipher = await cipherRepository.getCipherById(user.get('pk'), cipherUuid);
 
     if (!cipher) {
       callback(null, utils.validationError('Unknown vault item'));
       return;
     }
 
-    cipher.set(buildCipherDocument(body, user));
+    cipher.set(buildCipherDocument(body, user, cipherUuid));
 
     cipher = await cipher.updateAsync();
     await touch(user);
@@ -99,7 +99,7 @@ export const deleteHandler = async (event, context, callback) => {
   }
 
   try {
-    await Cipher.destroyAsync(user.get('uuid'), cipherUuid);
+    await cipherRepository.deleteCipherById(user.get('pk'), cipherUuid);
     await touch(user);
 
     callback(null, utils.okResponse(''));

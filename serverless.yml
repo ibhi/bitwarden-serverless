@@ -49,6 +49,9 @@ provider:
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.FOLDERS_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.TWOFACTOR_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}/index/UserEmailIndex"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}/index/InvertedIndex"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}/index/RefreshTokenDeviceIndex"
   usagePlan:
     throttle:
       burstLimit: 300 # request burst
@@ -392,9 +395,9 @@ resources:
         GlobalSecondaryIndexes:
           - IndexName: InvertedIndex
             KeySchema:
-              - AttributeName: pk
-                KeyType: HASH
               - AttributeName: sk
+                KeyType: HASH
+              - AttributeName: pk
                 KeyType: RANGE
             Projection:
               ProjectionType: ALL

@@ -1,6 +1,7 @@
 import { Query, DocumentCollection, Item, Document, Scan, Model } from 'dynogels';
 
 declare module 'dynogels' {
+    
     interface Query {
         execAsync(): Promise<ItemCollection>;
     }

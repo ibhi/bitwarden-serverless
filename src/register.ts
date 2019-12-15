@@ -1,6 +1,8 @@
 import * as utils from './lib/api_utils';
 import { User } from './lib/models';
 import { buildUserDocument } from './lib/bitwarden';
+import { userRepository, UserRepository } from './db/user-repository';
+import { mapToUser } from './lib/mappers';
 
 export const handler = async (event, context, callback) => {
   console.log('Registration handler triggered', JSON.stringify(event, null, 2));
@@ -27,17 +29,25 @@ export const handler = async (event, context, callback) => {
   }
 
   try {
-    const existingUser = await User.scan()
-      .where('email').equals(body.email.toLowerCase())
-      .select('COUNT')
-      .execAsync();
+    // const existingUser = await User.scan()
+    //   .where('email').equals(body.email.toLowerCase())
+    //   .select('COUNT')
+    //   .execAsync();
 
-    if (existingUser.Count > 0) {
+    // if (existingUser.Count > 0) {
+    //   callback(null, utils.validationError('E-mail already taken'));
+    //   return;
+    // }
+    const existingUser = await userRepository.getUserByEmail(body.email);
+
+    if(existingUser) {
       callback(null, utils.validationError('E-mail already taken'));
       return;
     }
 
-    await User.createAsync(buildUserDocument(body));
+    await userRepository.createUser(mapToUser(body));
+
+    // await User.createAsync(buildUserDocument(body));
 
     callback(null, utils.okResponse(''));
   } catch (e) {
