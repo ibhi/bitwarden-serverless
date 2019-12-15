@@ -10,14 +10,19 @@ service:
 #   individually: true
 plugins:
   - serverless-webpack
+  - serverless-dynamodb-local
 custom:
   webpack:
     webpackConfig: 'webpack.config.js'
     includeModules: true
     # keepOutputDirectory: true
+  dynamodb:
+  # If you only want to use DynamoDB Local in some stages, declare them here
+    stages:
+      - dev
 provider:
   name: aws
-  stage: ${opt:stage, 'prod'}
+  stage: ${opt:stage, 'dev'}
   runtime: nodejs10.x
   memorySize: 256
   timeout: 10
@@ -27,6 +32,7 @@ provider:
     CIPHERS_TABLE: ${self:service}-${self:provider.stage}-ciphers
     FOLDERS_TABLE: ${self:service}-${self:provider.stage}-folders
     TWOFACTOR_TABLE: ${self:service}-${self:provider.stage}-twofactor
+    BITWARDEN_TABLE: ${self:service}-${self:provider.stage}-bitwarden
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -42,6 +48,7 @@ provider:
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CIPHERS_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.FOLDERS_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.TWOFACTOR_TABLE}"
+        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}"
   usagePlan:
     throttle:
       burstLimit: 300 # request burst
@@ -358,4 +365,57 @@ resources:
           WriteCapacityUnits: 1
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
- 
+    BitwardenTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
+      Properties:
+        TableName: ${self:provider.environment.BITWARDEN_TABLE}
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: email
+            AttributeType: S
+          - AttributeName: refreshToken
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+        GlobalSecondaryIndexes:
+          - IndexName: InvertedIndex
+            KeySchema:
+              - AttributeName: pk
+                KeyType: HASH
+              - AttributeName: sk
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: UserEmailIndex
+            KeySchema:
+              - AttributeName: email
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1
+          - IndexName: RefreshTokenDeviceIndex
+            KeySchema:
+              - AttributeName: refreshToken
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+            ProvisionedThroughput:
+              ReadCapacityUnits: 1
+              WriteCapacityUnits: 1

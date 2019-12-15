@@ -12,6 +12,19 @@ export enum TwoFactorType {
     EmailVerificationChallenge = 1002,
 }
 
+export enum TwoFactorTypeKey {
+    Authenticator = 'authenticator',
+    Email = 'email',
+    Duo = 'duo',
+    YubiKey = 'yubiKey',
+    U2f = 'u2f',
+    Remember = 'remember',
+    OrganizationDuo = 'organizationDuo',
+    U2fRegisterChallenge = 'u2fRegisterChallenge',
+    U2fLoginChallenge = 'u2fLoginChallenge',
+    EmailVerificationChallenge = 'emailVerificationChallenge',
+}
+
 export interface GetTwofactorResponse {
     ContinuationToken: string | null;
     Data: GetTwofactorResponseData[];

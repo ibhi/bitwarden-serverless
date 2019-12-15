@@ -100,7 +100,7 @@ describe('Bitwarden cipher format', function() {
   });
 
   it('should test mac equality', function() {
-    expect(bitwardenCrypto.macsEqual('asdfasdfasdf', 'hi', 'hi')).to.be.truthy;
+    expect(bitwardenCrypto.macsEqual('asdfasdfasdf', 'hi', 'hi')).to.be.true;
   });
 
   it('should encrypt and decrypt with encryption key encrypted by master key', async function() {
