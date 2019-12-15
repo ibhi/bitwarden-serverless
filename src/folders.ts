@@ -2,6 +2,7 @@ import * as utils from './lib/api_utils';
 import { loadContextFromHeader, touch } from './lib/bitwarden';
 import { mapFolder } from './lib/mappers';
 import { Folder } from './lib/models';
+import { folderRepository } from './db/folder-repository';
 
 export const postHandler = async (event, context, callback) => {
   console.log('Folder create handler triggered', JSON.stringify(event, null, 2));
@@ -27,10 +28,7 @@ export const postHandler = async (event, context, callback) => {
   }
 
   try {
-    const folder = await Folder.createAsync({
-      name: body.name,
-      userUuid: user.get('uuid'),
-    });
+    const folder = await folderRepository.createFolder(user.get('pk'), body.name);
     await touch(user);
 
     callback(null, utils.okResponse(mapFolder(folder)));
@@ -67,8 +65,7 @@ export const putHandler = async (event, context, callback) => {
   }
 
   try {
-    let folder = await Folder.getAsync(user.get('uuid'), folderUuid);
-    await touch(user);
+    let folder = await folderRepository.getFolderById(user.get('pk'), folderUuid);
 
     if (!folder) {
       callback(null, utils.validationError('Unknown folder'));
@@ -78,6 +75,7 @@ export const putHandler = async (event, context, callback) => {
     folder.set({ name: body.name });
 
     folder = await folder.updateAsync();
+    await touch(user);
 
     callback(null, utils.okResponse(mapFolder(folder)));
   } catch (e) {
@@ -101,7 +99,7 @@ export const deleteHandler = async (event, context, callback) => {
   }
 
   try {
-    await Folder.destroyAsync(user.get('uuid'), folderUuid);
+    await folderRepository.deleteFolderById(user.get('pk'), folderUuid);
     await touch(user);
 
     callback(null, utils.okResponse(''));

@@ -22,14 +22,14 @@ export const getHandler = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
   }
 
   try {
-    const result = await genericTwofactorProvider.getAllAvailableTwofactors(user.get('uuid'));
+    const result = await genericTwofactorProvider.getAvailableTwofactors(user);
     callback(null, utils.okResponse(result));
     // {"ContinuationToken":null,"Data":[{"Enabled":true,"Object":"twoFactorProvider","Type":0},{"Enabled":true,"Object":"twoFactorProvider","Type":4}],"Object":"list"}
   } catch (e) {

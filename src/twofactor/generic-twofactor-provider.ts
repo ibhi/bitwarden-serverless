@@ -29,6 +29,26 @@ export class GenericTwofactorProvider {
         
     }
 
+    async getAvailableTwofactors(user: Item): Promise<GetTwofactorResponse> {
+
+        const twofactors = Object.keys(user.get('twofactors')).map(key => user.get('twofactors')[key]);
+        
+        const data = twofactors.map(twofactor => (
+            {
+                Enabled: twofactor.enabled,
+                Object: "twoFactorProvider",
+                Type: twofactor.type
+            }
+        ));
+    
+        return {
+            ContinuationToken: null,
+            Data: data,
+            Object: "list"
+        }
+        
+    }
+
     async getTwofactorByType(userUuid: string, type: number): Promise<Item[]> {
         return (await Twofactor
             .query(userUuid)

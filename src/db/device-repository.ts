@@ -1,6 +1,5 @@
 import { Item } from 'dynogels';
 import { Device } from './models';
-import { v4 as uuidV4 } from 'uuid';
 
 export class DeviceRepository {
 
