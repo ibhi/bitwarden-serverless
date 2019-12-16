@@ -1,15 +1,16 @@
-import { TwofactorProvider } from "./twofactor-provider";
-import { Twofactor as TwofactorModel, Twofactor } from "../lib/models";
+import { TwofactorProvider } from "./providers/twofactor-provider";
+import { Twofactor } from "../lib/models";
 import { Item, Model } from "dynogels";
-import { GetTwofactorResponse } from "./models";
+import { GetTwofactorResponse, TwoFactorType } from "./models";
 import { encode } from "hi-base32";
 import crypto from 'crypto';
+import { userRepository } from "../db/user-repository";
 
 export class GenericTwofactorProvider {
 
     async getAllAvailableTwofactors(userUuid: string): Promise<GetTwofactorResponse> {
         const twofactors: Item[] = (await
-            TwofactorModel
+            Twofactor
                 .query(userUuid)
                 .execAsync()).Items;
         
@@ -61,10 +62,7 @@ export class GenericTwofactorProvider {
     async generateRecoverCode(user: Item) {
         if(!user.get('recoverCode')) {
             const recoveryCode = encode(crypto.randomBytes(20));
-            user.set({
-                recoveryCode: recoveryCode
-            });
-            await user.updateAsync();
+            await userRepository.updateUser(user.get('pk'), { recoveryCode });
         }
     }
 
@@ -74,3 +72,4 @@ export class GenericTwofactorProvider {
 
 }
 
+export const genericTwofactorProvider = new GenericTwofactorProvider();

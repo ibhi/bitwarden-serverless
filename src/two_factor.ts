@@ -1,15 +1,15 @@
-import { Twofactor, User } from './lib/models';
+import { User } from './lib/models';
 import { loadContextFromHeader, hashesMatch, regenerateTokens } from './lib/bitwarden';
 import * as utils from './lib/api_utils';
 import { AuthenticatorProvider } from './twofactor/providers/authenticator-provider';
 import { decode } from 'hi-base32';
-import { GetAuthenticatorResponse, TwoFactorType } from './twofactor/models';
-import { GenericTwofactorProvider } from './twofactor/generic-twofactor-provider';
+import { GetAuthenticatorResponse, TwoFactorType, TwoFactorTypeKey } from './twofactor/models';
+import { GenericTwofactorProvider, genericTwofactorProvider } from './twofactor/generic-twofactor-provider';
 import { Item, reset } from 'dynogels';
 import * as u2f from 'u2f';
+import { Twofactor, userRepository } from './db/user-repository';
 
 const authenticatorProvider = new AuthenticatorProvider();
-const genericTwofactorProvider = new GenericTwofactorProvider();
 
 // Todo: make it configurable by the developer
 const APP_ID = 'https://localhost:8080';
@@ -57,7 +57,7 @@ export const disableTwofactorHandler = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -68,13 +68,13 @@ export const disableTwofactorHandler = async (event, context, callback) => {
     return;
   }
 
-  const type: number = parseInt(body.type, 10);
+  const type: TwoFactorType = parseInt(body.type, 10);
 
   try {
-    const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), type);
-  
+    const twofactor = userRepository.getTwofactorByType(user, type);
     if(twofactor) {
-      await twofactor.destroyAsync();
+      await userRepository.removeTwofactorByType(user.get('pk'), type);
+
       const result = {
         Enabled: false,
         Type: type,
@@ -108,7 +108,7 @@ export const getRecoveryCode = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -153,11 +153,12 @@ export const recover = async (event, context, callback) => {
 
   let user: Item;
   try {
-    [user] = (await User.scan()
-          .where('email').equals(body.email.toLowerCase())
-          .execAsync())
-          .Items;
-    console.log('User uuid ' + user.get('uuid'));
+    // [user] = (await User.scan()
+    //       .where('email').equals(body.email.toLowerCase())
+    //       .execAsync())
+    //       .Items;
+    user = await userRepository.getUserByEmail(body.email);
+    console.log('User uuid ' + user.get('pk'));
     if(!user) {
       throw new Error("Invalid email address");
     }
@@ -178,14 +179,9 @@ export const recover = async (event, context, callback) => {
   }
 
   try {
-    // Remove all twofactors from the user
-    await genericTwofactorProvider.deleteAllByUser(user.get('uuid'));
+    // Remove all twofactors from the user and the recovery code
+    await userRepository.deleteAllTwofactors(user.get('pk'));
 
-    // Remove the recovery code, not needed without twofactors
-    user.set({
-      recoveryCode: null
-    });
-    await user.updateAsync();
     callback(null, utils.okResponse({}));
     return;
   } catch (error) {
@@ -222,8 +218,9 @@ export const getAuthenticatorHandler = async (event, context, callback) => {
   }
 
   try {
-    const twofactor = await authenticatorProvider.getTwofactor(user.get('uuid'));
-    const result = authenticatorProvider.getAuthenticatorResponse(twofactor);
+    // const twofactor = await authenticatorProvider.getTwofactor(user.get('uuid'));
+    // const result = authenticatorProvider.getAuthenticatorResponse(twofactor);
+    const result = authenticatorProvider.getTwofactor(user);
 
     callback(null, utils.okResponse(result));
 
@@ -246,7 +243,7 @@ export const activateAuthenticatorHandler = async (event, context, callback) => 
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -277,18 +274,20 @@ export const activateAuthenticatorHandler = async (event, context, callback) => 
   }
 
   try {
-    const verified = authenticatorProvider.validate(user.get('uuid'), token, key)
+    const verified = authenticatorProvider.validate(user.get('pk'), token, key)
     
     if (verified) {
 
-      await genericTwofactorProvider.generateRecoverCode(user);
+      // await genericTwofactorProvider.generateRecoverCode(user);
 
-      const twofactor = await Twofactor.createAsync({
-        userUuid: user.get('uuid'),
-        aType: TwoFactorType.Authenticator,
+      const twofactor: Twofactor<string> = {
+        typeKey: TwoFactorTypeKey.Authenticator,
+        type: TwoFactorType.Authenticator,
         enabled: true,
-        data: key,
-      });
+        data: [key]
+      };
+
+      await userRepository.createTwofactor(user, twofactor);
       
       let result: GetAuthenticatorResponse = {
         Object: "twoFactorAuthenticator",
@@ -336,7 +335,9 @@ export const getU2f = async (event, context, callback) => {
     return;
   }
 
-  const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2f);
+  // const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2f);
+  const twofactor = userRepository.getTwofactorByType(user, TwoFactorType.U2f);
+// Todo: map the data in proper formar if it already exists
   const result = {
     Enabled: false,
     Keys: [],
@@ -346,11 +347,17 @@ export const getU2f = async (event, context, callback) => {
   if(!twofactor) {
     callback(null, utils.okResponse(result));
     return;
-  } else if(!twofactor.get('enabled') && !twofactor.get('data')) {
+  } else if(!twofactor.enabled && !twofactor.data) {
     callback(null, utils.okResponse(result));
     return;
   }
-// Todo: handle u2f registrations already exists scenario
+}
+
+export interface ChallengeResponse {
+  version: string;
+  appId: string,
+  challenge: string,
+  keyHandle?: string
 }
 
 // /two-factor/get-u2f-challenge POST
@@ -367,7 +374,7 @@ export const generateU2fChallenge = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -379,17 +386,19 @@ export const generateU2fChallenge = async (event, context, callback) => {
   }
 
   try {
-    const challengeResponse = u2f.request(APP_ID);
+    const challengeResponse: ChallengeResponse = u2f.request(APP_ID);
 
-    await Twofactor.createAsync({
-      userUuid: user.get('uuid'),
-      aType: TwoFactorType.U2fRegisterChallenge,
+    const twofactor: Twofactor<ChallengeResponse> = {
+      typeKey: TwoFactorTypeKey.U2fRegisterChallenge,
+      type: TwoFactorType.Authenticator,
       enabled: true,
-      data: JSON.stringify(challengeResponse)
-    });
+      data: [challengeResponse]
+    };
+
+    await userRepository.createTwofactor(user, twofactor);
 
     const result = {
-      UserId: user.get('uuid'),
+      UserId: user.get('pk'),
       AppId: APP_ID,
       Challenge: challengeResponse.challenge,
       Version: U2F_VERSION,
@@ -419,11 +428,11 @@ interface DeviceResponse {
   version: string;
 }
 
-interface Challange {
-  appId: string;
-  challenge: string;
-  version: string
-}
+// interface Challange {
+//   appId: string;
+//   challenge: string;
+//   version: string
+// }
 
 interface RegistrationCheckResponse {
   successful: boolean;
@@ -447,9 +456,9 @@ interface U2FRegistration {
   compromised: boolean;
 }
 
-const getU2fRegistrations = async(userUuid: string) => {
+// const getU2fRegistrations = async(userUuid: string) => {
   
-}
+// }
 
 
 // /two-factor/u2f POST
@@ -466,7 +475,7 @@ export const activateU2f = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -477,12 +486,14 @@ export const activateU2f = async (event, context, callback) => {
     return;
   }
 
-  let challenge: Challange;
+  let challenge: ChallengeResponse;
 
   try {
-    const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2fRegisterChallenge);
-    challenge = JSON.parse(twofactor.get('data'));
-    await twofactor.destroyAsync();
+    // const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2fRegisterChallenge);
+    const twofactor: Twofactor<ChallengeResponse> = userRepository.getTwofactorByType(user, TwoFactorType.U2fRegisterChallenge);
+    challenge = twofactor.data[0];
+    // await twofactor.destroyAsync();
+    await userRepository.removeTwofactorByType(user.get('pk'), TwoFactorType.U2fRegisterChallenge);
   } catch (error) {
     callback(null, utils.serverError('Error: Cant recover challenge', error));
     return;
@@ -515,27 +526,39 @@ export const activateU2f = async (event, context, callback) => {
         reg: reg,
         compromised: false,
         counter: 0
-      }
+      };
       // Get existing u2f twofactor record from DB
-      const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2f);
+      // const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2f);
+      const twofactor: Twofactor<U2FRegistration> = userRepository.getTwofactorByType(user, TwoFactorType.U2f);
+
       // Parse the data field to array of U2FRegistration
-      let regs: U2FRegistration[]
-      if(twofactor && twofactor.get('data')) {
-        regs = JSON.parse(twofactor.get('data'))
+      let regs: U2FRegistration[];
+      if(twofactor && twofactor.data) {
+        regs = twofactor.data;
       } else {
-        regs = []
+        regs = [];
       }
       // Push the new registration data to the existing array
       regs.push(fullRegistration);
-      // Update the twofactor record
-      await Twofactor.updateAsync({
-        userUuid: user.get('uuid'),
+      
+      const newTwofactor: Twofactor<U2FRegistration> = {
+        typeKey: TwoFactorTypeKey.U2f,
+        type: TwoFactorType.U2f,
         enabled: true,
-        data: JSON.stringify(regs),
-        aType: TwoFactorType.U2f
-      });
+        data: regs,
+      }
+      
+      await userRepository.createTwofactor(user, newTwofactor);
+
+      // Update the twofactor record
+      // await Twofactor.updateAsync({
+      //   userUuid: user.get('uuid'),
+      //   enabled: true,
+      //   data: JSON.stringify(regs),
+      //   aType: TwoFactorType.U2f
+      // });
       // generate recovery code 
-      await genericTwofactorProvider.generateRecoverCode(user);
+      // await genericTwofactorProvider.generateRecoverCode(user);
       // prepare the json response
       const keys = regs.map(reg => ({
         Id: reg.id,

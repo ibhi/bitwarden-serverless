@@ -1,10 +1,10 @@
 import querystring from 'querystring';
 import speakeasy from 'speakeasy';
 import * as utils from './lib/api_utils';
-import { User, Device, Twofactor } from './lib/models';
+// import { User, Device, Twofactor } from './lib/models';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
-import { TwoFactorType } from './twofactor/models';
-import { userRepository } from './db/user-repository';
+import { TwoFactorType, TwoFactorTypeKey } from './twofactor/models';
+import { userRepository, Twofactor } from './db/user-repository';
 import { deviceRepository } from './db/device-repository';
 import { Item } from 'dynogels';
 
@@ -117,7 +117,7 @@ export const handler = async (event, context, callback) => {
 
         // }
 
-        const twofactors = user.get('twofactors');
+        const twofactors: Map<TwoFactorTypeKey, Twofactor<any>> = user.get('twofactors');
 
         let enabled = true;
 
@@ -126,8 +126,8 @@ export const handler = async (event, context, callback) => {
         }
 
         if(enabled) {
-          const twofactorsList = Object.keys(twofactors).map(key => twofactors[key]);
-          const twofactorIds: number[] = twofactorsList.map(twofactor => twofactor.type);
+          const twofactorsList: Twofactor<any>[] = Object.keys(twofactors).map(key => twofactors[key]);
+          const twofactorIds: TwoFactorType[] = twofactorsList.map(twofactor => twofactor.type);
 
           const selectedId = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
           
@@ -145,7 +145,7 @@ export const handler = async (event, context, callback) => {
             return;
           }
 
-          const selectedTwofactor = twofactorsList
+          const selectedTwofactor: Twofactor<any> = twofactorsList
             .filter(twofactor => twofactor.type === selectedId && twofactor.enabled)[0];
           const selectedData = selectedTwofactor.data;
           const remember = body.twofactoremember || 0;
@@ -154,7 +154,7 @@ export const handler = async (event, context, callback) => {
           switch(selectedId) {
             case TwoFactorType.Authenticator:
               verified = speakeasy.totp.verify({
-                secret: selectedData,
+                secret: selectedData[0],
                 encoding: 'base32',
                 token: body.twofactortoken,
               });
