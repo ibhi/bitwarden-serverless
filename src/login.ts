@@ -1,12 +1,16 @@
 import querystring from 'querystring';
 import speakeasy from 'speakeasy';
 import * as utils from './lib/api_utils';
-// import { User, Device, Twofactor } from './lib/models';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
 import { TwoFactorType, TwoFactorTypeKey } from './twofactor/models';
 import { userRepository, Twofactor } from './db/user-repository';
 import { deviceRepository } from './db/device-repository';
 import { Item } from 'dynogels';
+import { Registration, U2FRegistration, ChallengeResponse } from './two_factor';
+import { User } from './lib/models';
+import * as u2f from 'u2f';
+
+const APP_ID = 'https://localhost:8080';
 
 export const handler = async (event, context, callback) => {
   console.log('Login handler triggered', JSON.stringify(event, null, 2));
@@ -59,64 +63,6 @@ export const handler = async (event, context, callback) => {
           return;
         }
 
-        // let twofactors = (await Twofactor.query(user.get('uuid')).execAsync()).Items;
-        // let enabled = true;
-
-        // if(twofactors && twofactors.length === 0) {
-        //   enabled = false;
-        // }
-
-        // if(enabled) {
-        //   let twofactorIds = twofactors.map(twofactor => twofactor.get('aType'));
-        //   let selectedId = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
-          
-        //   if(!body.twofactortoken) {
-        //     callback(null, {
-        //       statusCode: 400,
-        //       headers: utils.CORS_HEADERS,
-        //       body: JSON.stringify({
-        //         error: 'invalid_grant',
-        //         error_description: 'Two factor required.',
-        //         TwoFactorProviders: twofactorIds,
-        //         TwoFactorProviders2: { 0: null },
-        //       }),
-        //     });
-        //     return;
-        //   }
-
-        //   let selectedTwofactor = twofactors
-        //     .filter(twofactor => twofactor.get('aType') === selectedId && twofactor.get('enabled'))[0];
-        //   let selectedData = selectedTwofactor.get('data');
-        //   let remember = body.twofactoremember || 0;
-        //   let verified = false;
-
-        //   switch(selectedId) {
-        //     case TwoFactorType.Authenticator:
-        //       verified = speakeasy.totp.verify({
-        //         secret: selectedData,
-        //         encoding: 'base32',
-        //         token: body.twofactortoken,
-        //       });
-        //       break;
-        //           // More two facto auth providers
-        //   }
-
-        //   if (!verified) {
-        //     callback(null, {
-        //       statusCode: 400,
-        //       headers: utils.CORS_HEADERS,
-        //       body: JSON.stringify({
-        //         error: 'invalid_grant',
-        //         error_description: 'Two factor required.',
-        //         TwoFactorProviders: [0],
-        //         TwoFactorProviders2: { 0: null },
-        //       }),
-        //     });
-        //     return;
-        //   }
-
-        // }
-
         const twofactors: Map<TwoFactorTypeKey, Twofactor<any>> = user.get('twofactors');
 
         let enabled = true;
@@ -127,11 +73,12 @@ export const handler = async (event, context, callback) => {
 
         if(enabled) {
           const twofactorsList: Twofactor<any>[] = Object.keys(twofactors).map(key => twofactors[key]);
-          const twofactorIds: TwoFactorType[] = twofactorsList.map(twofactor => twofactor.type);
+          const twofactorIds: TwoFactorType[] = twofactorsList.map(twofactor => twofactor.type).sort();
 
           const selectedId = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
           
           if(!body.twofactortoken) {
+
             callback(null, {
               statusCode: 400,
               headers: utils.CORS_HEADERS,
@@ -139,7 +86,7 @@ export const handler = async (event, context, callback) => {
                 error: 'invalid_grant',
                 error_description: 'Two factor required.',
                 TwoFactorProviders: twofactorIds,
-                TwoFactorProviders2: { 0: null },
+                TwoFactorProviders2: await getTwofactorProviders(twofactorIds, user),
               }),
             });
             return;
@@ -256,4 +203,45 @@ export const handler = async (event, context, callback) => {
   } catch (e) {
     callback(null, utils.serverError('Internal error', e));
   }
+};
+
+const getU2fRegistrations = (user: Item): Registration[] => {
+  const twofactor: Twofactor<U2FRegistration> = userRepository.getTwofactorByType(user, TwoFactorType.U2f);
+  return twofactor.data.map(d => d.reg)
+}
+
+const getTwofactorProviders = async (twofacorTypes: TwoFactorType[], user: Item) => {
+  const twofactorProviders2: any = {};
+
+  for(let twoFactorType of twofacorTypes) {
+    switch(twoFactorType) {
+      case TwoFactorType.Authenticator:
+        twofactorProviders2[twoFactorType] = null;
+        break;
+        // Check for domain/appId set
+      case TwoFactorType.U2f:
+        console.log('Inside u2f case');
+        const challenges = await createU2fLoginChallenges(user)
+        twofactorProviders2[twoFactorType] = { Challenges: JSON.stringify(challenges)};
+        console.log('Login challenges ' + JSON.stringify(challenges));
+        break;
+    }
+  }
+  
+  return twofactorProviders2;
+}
+
+const createU2fLoginChallenges = async (user: Item): Promise<ChallengeResponse[]> => {
+  const data = getU2fRegistrations(user)
+    .map(registration => u2f.request(APP_ID, registration.keyHandle) as ChallengeResponse);
+  
+  const twofactor: Twofactor<ChallengeResponse> = {
+    type: TwoFactorType.U2fLoginChallenge,
+    typeKey: TwoFactorTypeKey.U2fLoginChallenge,
+    enabled: true,
+    data: data
+  };
+
+  await userRepository.createTwofactor(user, twofactor);
+  return data;
 };

@@ -3,6 +3,12 @@ import { User } from "./models";
 import { TwoFactorType, TwoFactorTypeKey } from "../twofactor/models";
 import { encode } from "hi-base32";
 import crypto from 'crypto';
+import { ChallengeResponse, U2FRegistration, Registration } from "../two_factor";
+import * as u2f from 'u2f';
+
+
+const APP_ID = 'https://localhost:8080';
+const U2F_VERSION = 'U2F_V2';
 
 export interface Twofactor<T> {
     typeKey: TwoFactorTypeKey;
@@ -78,6 +84,24 @@ export class UserRepository {
             sk: userUuid,
         }, params);
     }
+
+    async createU2fChallenge(user: Item, type: TwoFactorType): Promise<ChallengeResponse> {
+        const challengeResponse: ChallengeResponse = u2f.request(APP_ID);
+        const typeKey = UserRepository.twofactorKeyToTypeMap.get(type) || TwoFactorTypeKey.U2f;
+
+        const twofactor: Twofactor<ChallengeResponse> = {
+            typeKey: typeKey,
+            type: type,
+            enabled: true,
+            data: [challengeResponse]
+        };
+
+        await this.createTwofactor(user, twofactor);
+
+        return challengeResponse;
+    }
+
+    
 
     removeTwofactorByType(userUuid: string, type: TwoFactorType): Promise<Item> {
         console.log('Type value ' + type);

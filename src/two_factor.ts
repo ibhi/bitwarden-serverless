@@ -7,13 +7,13 @@ import { GetAuthenticatorResponse, TwoFactorType, TwoFactorTypeKey } from './two
 import { GenericTwofactorProvider, genericTwofactorProvider } from './twofactor/generic-twofactor-provider';
 import { Item, reset } from 'dynogels';
 import * as u2f from 'u2f';
-import { Twofactor, userRepository } from './db/user-repository';
+import { Twofactor, userRepository, UserRepository } from './db/user-repository';
 
 const authenticatorProvider = new AuthenticatorProvider();
 
 // Todo: make it configurable by the developer
 const APP_ID = 'https://localhost:8080';
-const U2F_VERSION = 'U2F_V2';
+export const U2F_VERSION = 'U2F_V2';
 
 // /two-factor GET
 export const getHandler = async (event, context, callback) => {
@@ -360,6 +360,22 @@ export interface ChallengeResponse {
   keyHandle?: string
 }
 
+const createU2fChallenge = async (user: Item, type: TwoFactorType): Promise<ChallengeResponse> => {
+  const challengeResponse: ChallengeResponse = u2f.request(APP_ID);
+  const typeKey = UserRepository.twofactorKeyToTypeMap.get(type) || TwoFactorTypeKey.U2f;
+
+  const twofactor: Twofactor<ChallengeResponse> = {
+      typeKey: typeKey,
+      type: type,
+      enabled: true,
+      data: [challengeResponse]
+  };
+
+  await userRepository.createTwofactor(user, twofactor);
+
+  return challengeResponse;
+}
+
 // /two-factor/get-u2f-challenge POST
 export const generateU2fChallenge = async (event, context, callback) => {
   console.log('2FA get u2f handler triggered', JSON.stringify(event, null, 2));
@@ -386,23 +402,15 @@ export const generateU2fChallenge = async (event, context, callback) => {
   }
 
   try {
-    const challengeResponse: ChallengeResponse = u2f.request(APP_ID);
 
-    const twofactor: Twofactor<ChallengeResponse> = {
-      typeKey: TwoFactorTypeKey.U2fRegisterChallenge,
-      type: TwoFactorType.Authenticator,
-      enabled: true,
-      data: [challengeResponse]
-    };
-
-    await userRepository.createTwofactor(user, twofactor);
+    const challengeResponse: ChallengeResponse = await createU2fChallenge(user, TwoFactorType.U2fRegisterChallenge);
 
     const result = {
       UserId: user.get('pk'),
       AppId: APP_ID,
       Challenge: challengeResponse.challenge,
       Version: U2F_VERSION,
-    }
+    };
 
     callback(null, utils.okResponse(result));
     return;
@@ -442,13 +450,13 @@ interface RegistrationCheckResponse {
   errorMessage?: string;
 }
 
-interface Registration {
+export interface Registration {
   pubKey: string;
   keyHandle: string;
   attestationCert: string;
 }
 
-interface U2FRegistration {
+export interface U2FRegistration {
   id: string | number;
   name: string;
   reg: Registration;
@@ -550,16 +558,6 @@ export const activateU2f = async (event, context, callback) => {
       
       await userRepository.createTwofactor(user, newTwofactor);
 
-      // Update the twofactor record
-      // await Twofactor.updateAsync({
-      //   userUuid: user.get('uuid'),
-      //   enabled: true,
-      //   data: JSON.stringify(regs),
-      //   aType: TwoFactorType.U2f
-      // });
-      // generate recovery code 
-      // await genericTwofactorProvider.generateRecoverCode(user);
-      // prepare the json response
       const keys = regs.map(reg => ({
         Id: reg.id,
         Name: reg.name,
