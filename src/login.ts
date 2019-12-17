@@ -1,16 +1,13 @@
 import querystring from 'querystring';
-import speakeasy from 'speakeasy';
 import * as utils from './lib/api_utils';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
-import { TwoFactorType, TwoFactorTypeKey } from './twofactor/models';
-import { userRepository, Twofactor } from './db/user-repository';
+import { TwoFactorType, TwoFactorTypeKey, Twofactor } from './twofactor/models';
+import { userRepository } from './db/user-repository';
 import { deviceRepository } from './db/device-repository';
 import { Item } from 'dynogels';
-import { Registration, U2FRegistration, ChallengeResponse } from './two_factor';
-import { User } from './lib/models';
-import * as u2f from 'u2f';
-
-const APP_ID = 'https://localhost:8080';
+import { authenticatorProvider } from './twofactor/providers/authenticator-provider';
+import { u2fProvider } from './twofactor/providers/u2f-provider';
+import { genericTwofactorProvider } from './twofactor/providers/generic-twofactor-provider';
 
 export const handler = async (event, context, callback) => {
   console.log('Login handler triggered', JSON.stringify(event, null, 2));
@@ -63,19 +60,19 @@ export const handler = async (event, context, callback) => {
           return;
         }
 
-        const twofactors: Map<TwoFactorTypeKey, Twofactor<any>> = user.get('twofactors');
+        const twofactors: Twofactor<any>[] = genericTwofactorProvider.getAvailableTwofactors(user);
 
         let enabled = true;
 
-        if(Object.keys(twofactors).length === 0) {
+        if(twofactors.length === 0) {
           enabled = false;
         }
 
         if(enabled) {
-          const twofactorsList: Twofactor<any>[] = Object.keys(twofactors).map(key => twofactors[key]);
-          const twofactorIds: TwoFactorType[] = twofactorsList.map(twofactor => twofactor.type).sort();
+          // const twofactorsList: Twofactor<any>[] = Object.keys(twofactors).map(key => twofactors[key]);
+          const twofactorIds: TwoFactorType[] = twofactors.map(twofactor => twofactor.type).sort();
 
-          const selectedId = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
+          const selectedId: TwoFactorType = parseInt(body.twofactorprovider, 10) || twofactorIds[0]; // If we aren't given a two factor provider, assume the first one
           
           if(!body.twofactortoken) {
 
@@ -92,7 +89,7 @@ export const handler = async (event, context, callback) => {
             return;
           }
 
-          const selectedTwofactor: Twofactor<any> = twofactorsList
+          const selectedTwofactor: Twofactor<any> = twofactors
             .filter(twofactor => twofactor.type === selectedId && twofactor.enabled)[0];
           const selectedData = selectedTwofactor.data;
           const remember = body.twofactoremember || 0;
@@ -100,11 +97,10 @@ export const handler = async (event, context, callback) => {
 
           switch(selectedId) {
             case TwoFactorType.Authenticator:
-              verified = speakeasy.totp.verify({
-                secret: selectedData[0],
-                encoding: 'base32',
-                token: body.twofactortoken,
-              });
+              verified = authenticatorProvider.validate(body.twofactortoken, selectedData[0]);
+              break;
+            case TwoFactorType.U2f:
+              verified = await u2fProvider.validate(user, body.twofactortoken);
               break;
                   // More two facto auth providers
           }
@@ -205,10 +201,7 @@ export const handler = async (event, context, callback) => {
   }
 };
 
-const getU2fRegistrations = (user: Item): Registration[] => {
-  const twofactor: Twofactor<U2FRegistration> = userRepository.getTwofactorByType(user, TwoFactorType.U2f);
-  return twofactor.data.map(d => d.reg)
-}
+
 
 const getTwofactorProviders = async (twofacorTypes: TwoFactorType[], user: Item) => {
   const twofactorProviders2: any = {};
@@ -221,7 +214,7 @@ const getTwofactorProviders = async (twofacorTypes: TwoFactorType[], user: Item)
         // Check for domain/appId set
       case TwoFactorType.U2f:
         console.log('Inside u2f case');
-        const challenges = await createU2fLoginChallenges(user)
+        const challenges = await u2fProvider.createU2fLoginChallenges(user)
         twofactorProviders2[twoFactorType] = { Challenges: JSON.stringify(challenges)};
         console.log('Login challenges ' + JSON.stringify(challenges));
         break;
@@ -231,17 +224,4 @@ const getTwofactorProviders = async (twofacorTypes: TwoFactorType[], user: Item)
   return twofactorProviders2;
 }
 
-const createU2fLoginChallenges = async (user: Item): Promise<ChallengeResponse[]> => {
-  const data = getU2fRegistrations(user)
-    .map(registration => u2f.request(APP_ID, registration.keyHandle) as ChallengeResponse);
-  
-  const twofactor: Twofactor<ChallengeResponse> = {
-    type: TwoFactorType.U2fLoginChallenge,
-    typeKey: TwoFactorTypeKey.U2fLoginChallenge,
-    enabled: true,
-    data: data
-  };
 
-  await userRepository.createTwofactor(user, twofactor);
-  return data;
-};

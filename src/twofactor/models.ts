@@ -42,3 +42,53 @@ export interface GetAuthenticatorResponse {
     Enabled: boolean; 
     Key: string; 
 }
+
+export interface ChallengeResponse {
+    version: string;
+    appId: string,
+    challenge: string,
+    keyHandle?: string
+}
+
+export interface Registration {
+    pubKey: string;
+    keyHandle: string;
+    attestationCert: string;
+}
+
+export interface U2FRegistration {
+    id: string | number;
+    name: string;
+    reg: Registration;
+    counter: number;
+    compromised: boolean;
+}
+
+export interface DeviceResponse {
+    clientData: string;
+    errorCode: number;
+    registrationData: string;
+    version: string;
+}
+
+export interface RegistrationCheckResponse {
+    successful: boolean;
+    publicKey: string;
+    keyHandle: string;
+    certificate: string;
+    errorMessage?: string;
+}
+
+export interface Twofactor<T> {
+    typeKey: TwoFactorTypeKey;
+    type: TwoFactorType;
+    enabled: boolean;
+    data: T[];
+}
+
+export interface SignResponse {
+    clientData: string;
+    errorCode: number;
+    keyHandle: string;
+    signatureData: string;
+}

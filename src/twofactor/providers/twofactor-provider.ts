@@ -1,8 +1,7 @@
-import { Item } from "dynogels";
-import { GetTwofactorResponse, GetAuthenticatorResponse } from "../models";
+// import { Item } from "dynogels";
+// import { TwoFactorType } from "../models";
 
-export interface TwofactorProvider {
-    validate(userUuid: string, twofactorCode: string, selectedData: string): boolean;
-    getTwofactor(user: Item): GetAuthenticatorResponse;
-    // getAllAvailableTwofactors(userUuid: string): Promise<GetTwofactorResponse>
-}
+// export interface TwofactorProvider {
+//     validate(user: Item, twofactorCode: string, selectedData: string): boolean;
+//     getTwofactor<T>(user: Item, type: TwoFactorType): T;
+// }
