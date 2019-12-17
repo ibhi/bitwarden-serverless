@@ -10,7 +10,6 @@ import { u2fProvider } from './twofactor/providers/u2f-provider';
 
 
 // Todo: make it configurable by the developer
-const APP_ID = 'https://localhost:8080';
 export const U2F_VERSION = 'U2F_V2';
 
 // /two-factor GET
@@ -322,7 +321,7 @@ export const getU2f = async (event, context, callback) => {
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
-    console.log('User uuid ' + user.get('uuid'));
+    console.log('User uuid ' + user.get('pk'));
   } catch (e) {
     callback(null, utils.validationError('User not found: ' + e.message));
     return;
@@ -381,9 +380,9 @@ export const generateU2fChallenge = async (event, context, callback) => {
 
     const result = {
       UserId: user.get('pk'),
-      AppId: APP_ID,
+      AppId: challengeResponse.appId,
       Challenge: challengeResponse.challenge,
-      Version: U2F_VERSION,
+      Version: challengeResponse.version,
     };
 
     callback(null, utils.okResponse(result));

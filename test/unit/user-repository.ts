@@ -3,9 +3,6 @@ import { User } from '../../src/db/models';
 import { v4 as uuidV4 } from 'uuid';
 import { expect } from 'chai';
 import * as AWS from 'aws-sdk';
-import { TwoFactorType, TwoFactorTypeKey } from '../../src/twofactor/models';
-import { Twofactor } from '../../src/lib/models';
-import { throws } from 'assert';
 const userRepository = new UserRepository();
 // const AWS = require('aws-sdk');
 
