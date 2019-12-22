@@ -5,7 +5,7 @@ import { decode } from 'hi-base32';
 import { GetAuthenticatorResponse, TwoFactorType, TwoFactorTypeKey, ChallengeResponse, U2FRegistration, Registration, DeviceResponse, RegistrationCheckResponse, Twofactor } from './twofactor/models';
 import { genericTwofactorProvider } from './twofactor/providers/generic-twofactor-provider';
 import { Item } from 'dynogels';
-import { userRepository } from './db/user-repository';
+import { userRepository, UserRepository } from './db/user-repository';
 import { u2fProvider } from './twofactor/providers/u2f-provider';
 
 
@@ -332,21 +332,36 @@ export const getU2f = async (event, context, callback) => {
     return;
   }
 
-  const twofactor: Twofactor<ChallengeResponse> = u2fProvider.getTwofactor(user, TwoFactorType.U2f);
-// Todo: map the data in proper formar if it already exists
-  const result = {
-    Enabled: false,
-    Keys: [],
-    Object: "twoFactorU2f"
+  const twofactor: Twofactor<U2FRegistration> = u2fProvider.getTwofactor(user, TwoFactorType.U2f);
+  
+  console.log('Twofactor ' + JSON.stringify(twofactor));
+
+  const enabled = twofactor && twofactor.enabled;
+  let keys: { Compromised: boolean, Id: string | number, Name: string }[] = [];
+  if(twofactor && twofactor.enabled && twofactor.data.length > 0) {
+    keys = twofactor.data.map(key => ({
+        Compromised: key.compromised,
+        Id: key.id,
+        Name: key.name
+      })
+    );
   }
 
-  if(!twofactor) {
-    callback(null, utils.okResponse(result));
-    return;
-  } else if(!twofactor.enabled && !twofactor.data) {
-    callback(null, utils.okResponse(result));
-    return;
-  }
+  callback(null, utils.okResponse({
+    Enabled: enabled,
+    Keys: keys,
+    Object: "twoFactorU2f"
+  }))
+  // if(!twofactor) {
+  //   console.log('Inside if');
+  //   callback(null, utils.okResponse(result));
+  //   return;
+  // } else if(!twofactor.enabled && !twofactor.data) {
+  //   console.log('Inside else if')
+  //   callback(null, utils.okResponse(result));
+  //   return;
+  // }
+  // console.log('Outside if else');
 }
 
 // /two-factor/get-u2f-challenge POST
@@ -415,7 +430,7 @@ export const activateU2f = async (event, context, callback) => {
 
   const body: EnableU2FData = utils.normalizeBody(JSON.parse(event.body));
 
-  let user;
+  let user: Item;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
     console.log('User uuid ' + user.get('pk'));
@@ -436,7 +451,7 @@ export const activateU2f = async (event, context, callback) => {
     const twofactor: Twofactor<ChallengeResponse> = u2fProvider.getTwofactor(user, TwoFactorType.U2fRegisterChallenge);
     challenge = twofactor.data[0];
     // await twofactor.destroyAsync();
-    await u2fProvider.removeTwofactor(user.get('pk'), TwoFactorType.U2fRegisterChallenge);
+    await u2fProvider.removeTwofactor(user, TwoFactorType.U2fRegisterChallenge);
   } catch (error) {
     callback(null, utils.serverError('Error: Cant recover challenge', error));
     return;
@@ -466,7 +481,8 @@ export const activateU2f = async (event, context, callback) => {
       const fullRegistration: U2FRegistration = {
         id: body.id,
         name: body.name,
-        reg: reg,
+        ...reg,
+        // reg: reg,
         compromised: false,
         counter: 0
       };

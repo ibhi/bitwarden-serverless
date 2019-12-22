@@ -1,8 +1,10 @@
-import { ChallengeResponse, DeviceResponse, RegistrationCheckResponse, TwoFactorType, TwoFactorTypeKey, Registration, U2FRegistration, Twofactor, SignResponse } from '../models';
+import { ChallengeResponse, DeviceResponse, RegistrationCheckResponse, TwoFactorType, TwoFactorTypeKey, U2FRegistration, Twofactor, SignResponse } from '../models';
 import { userRepository, UserRepository } from '../../db/user-repository';
 import { BaseTwofactorProvider } from './base-twofactor-provider';
 import * as u2f from 'u2f';
 import { Item } from 'dynogels';
+import { User } from '../../db/models';
+// import { User } from '../../lib/models';
 
 const APP_ID = 'https://localhost:8080';
 
@@ -28,8 +30,9 @@ export class U2fProvider extends BaseTwofactorProvider {
         // Now we can delete the U2fLoginChallenge
         await this.removeTwofactor(user, TwoFactorType.U2fLoginChallenge);
         const response: SignResponse = JSON.parse(twofactorCode);
+        const keyHandle = response.keyHandle;
 
-        const registrations: Registration[] = this.getU2fRegistrations(user);
+        const registrations: U2FRegistration[] = this.getU2fRegistrations(user);
 
         if(registrations.length === 0) {
             throw Error('No U2F devices registered');
@@ -38,12 +41,18 @@ export class U2fProvider extends BaseTwofactorProvider {
         // twofactor code contains signature created by one of the registered u2f device
         // find that one using the keyHandle and use it to verify
         
-        const matchedRegistration: Registration = registrations.filter(registration => registration.keyHandle === response.keyHandle)[0];
+        const matchedRegistration: U2FRegistration = registrations.filter(registration => registration.keyHandle === keyHandle)[0];
 
         const result = u2f.checkSignature(challenge, response, matchedRegistration.pubKey);
 
         if(result.successful) {
-            return true;
+            if(matchedRegistration.counter < result.counter) {
+                await this.updateU2fCounter(user, registrations, keyHandle, result.counter);
+                return true;
+            } else {
+                await this.updateU2fCompromised(user, registrations, keyHandle, true);
+                throw Error('This device might be compromised!');
+            }
         }
 
         return false;
@@ -84,9 +93,49 @@ export class U2fProvider extends BaseTwofactorProvider {
         return data;
     }
 
-    private getU2fRegistrations(user: Item): Registration[] {
-        const twofactor: Twofactor<U2FRegistration> = u2fProvider.getTwofactor(user, TwoFactorType.U2f);
-        return twofactor.data.map(d => d.reg);
+    async updateU2fCounter(user: Item, registrations: U2FRegistration[], keyHandle: string, counter: number): Promise<Item> {
+        const index = registrations.findIndex(reg => reg.keyHandle === keyHandle);
+        // Todo: Move this logic to user repository
+        let params: any = {};
+        params.UpdateExpression = `SET #twofactors.u2f.#data[${index}].#counter = :counter`;
+        params.ExpressionAttributeNames = {
+            '#twofactors' : 'twofactors',
+            '#data' : 'data',
+            '#counter': 'counter'
+        };
+        params.ExpressionAttributeValues = {
+            ':counter' : counter
+        };
+
+        return User.updateAsync({
+            pk: user.get(UserRepository.PARTITION_KEY),
+            sk: user.get(UserRepository.SORT_KEY),
+        }, params);
+    }
+
+    async updateU2fCompromised(user: Item, registrations: U2FRegistration[], keyHandle: string, compromised: boolean): Promise<Item> {
+        const index = registrations.findIndex(reg => reg.keyHandle === keyHandle);
+        // Todo: Move this logic to user repository
+        let params: any = {};
+        params.UpdateExpression = `SET #twofactors.u2f.#data[${index}].#compromised = :compromised`;
+        params.ExpressionAttributeNames = {
+            '#twofactors' : 'twofactors',
+            '#data' : 'data',
+            '#compromised': 'compromised'
+        };
+        params.ExpressionAttributeValues = {
+            ':compromised' : compromised
+        };
+
+        return User.updateAsync({
+            pk: user.get(UserRepository.PARTITION_KEY),
+            sk: user.get(UserRepository.SORT_KEY),
+        }, params);
+    }
+
+    private getU2fRegistrations(user: Item): U2FRegistration[] {
+        const twofactor: Twofactor<U2FRegistration> = this.getTwofactor(user, TwoFactorType.U2f);
+        return twofactor.data;
     }
 
 }

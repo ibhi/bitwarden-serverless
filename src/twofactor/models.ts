@@ -59,9 +59,12 @@ export interface Registration {
 export interface U2FRegistration {
     id: string | number;
     name: string;
-    reg: Registration;
+    // reg: Registration;
     counter: number;
     compromised: boolean;
+    pubKey: string;
+    keyHandle: string;
+    attestationCert: string;
 }
 
 export interface DeviceResponse {

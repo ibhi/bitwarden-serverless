@@ -2,12 +2,13 @@ import querystring from 'querystring';
 import * as utils from './lib/api_utils';
 import { regenerateTokens, hashesMatch, DEFAULT_VALIDITY } from './lib/bitwarden';
 import { TwoFactorType, TwoFactorTypeKey, Twofactor } from './twofactor/models';
-import { userRepository } from './db/user-repository';
-import { deviceRepository } from './db/device-repository';
+import { userRepository, UserRepository } from './db/user-repository';
+import { deviceRepository, DeviceRepository } from './db/device-repository';
 import { Item } from 'dynogels';
 import { authenticatorProvider } from './twofactor/providers/authenticator-provider';
 import { u2fProvider } from './twofactor/providers/u2f-provider';
 import { genericTwofactorProvider } from './twofactor/providers/generic-twofactor-provider';
+import crypto from 'crypto';
 
 export const handler = async (event, context, callback) => {
   console.log('Login handler triggered', JSON.stringify(event, null, 2));
@@ -18,10 +19,13 @@ export const handler = async (event, context, callback) => {
 
   const body = utils.normalizeBody(querystring.parse(event.body));
 
+  console.log('Body ' + JSON.stringify(body));
+
   let eventHeaders;
   let device;
   let deviceType;
   let user: Item;
+  let twofactorRememberToken;
 
   try {
     switch (body.grant_type) {
@@ -60,8 +64,23 @@ export const handler = async (event, context, callback) => {
           return;
         }
 
-        const twofactors: Twofactor<any>[] = genericTwofactorProvider.getAvailableTwofactors(user);
+        const userUuid = user.get('pk');
 
+        // Web vault doesn't send device identifier
+        if (body.deviceidentifier) {
+          // Device prefix will be added inside the device-repository
+          device = await deviceRepository.getDeviceById(userUuid, body.deviceidentifier);
+          if (device && device.get('pk') !== user.get('pk')) {
+            await device.destroyAsync();
+            device = null;
+          }
+        }
+        
+        if (!device) {
+          device = await deviceRepository.createDevice(userUuid, body.deviceidentifier);
+        }
+
+        const twofactors: Twofactor<any>[] = genericTwofactorProvider.getAvailableTwofactors(user);
         let enabled = true;
 
         if(twofactors.length === 0) {
@@ -69,6 +88,8 @@ export const handler = async (event, context, callback) => {
         }
 
         if(enabled) {
+          let remember = parseInt(body.twofactorremember, 10) || 0;
+          
           // const twofactorsList: Twofactor<any>[] = Object.keys(twofactors).map(key => twofactors[key]);
           const twofactorIds: TwoFactorType[] = twofactors.map(twofactor => twofactor.type).sort();
 
@@ -91,8 +112,7 @@ export const handler = async (event, context, callback) => {
 
           const selectedTwofactor: Twofactor<any> = twofactors
             .filter(twofactor => twofactor.type === selectedId && twofactor.enabled)[0];
-          const selectedData = selectedTwofactor.data;
-          const remember = body.twofactoremember || 0;
+          const selectedData = selectedTwofactor && selectedTwofactor.data;
           let verified = false;
 
           switch(selectedId) {
@@ -102,7 +122,14 @@ export const handler = async (event, context, callback) => {
             case TwoFactorType.U2f:
               verified = await u2fProvider.validate(user, body.twofactortoken);
               break;
-                  // More two facto auth providers
+            case TwoFactorType.Remember:
+              if(body.twofactortoken === device.get('twofactorRemember')) {
+                // Set remember to 1 again here, otherwise it will remember only the first time
+                remember = 1;
+                verified = true;
+              }
+              break;
+            //Todo: More two facto auth providers
           }
 
           if (!verified) {
@@ -119,23 +146,20 @@ export const handler = async (event, context, callback) => {
             return;
           }
 
-        }
-
-        const userUuid = user.get('pk');
-
-        // Web vault doesn't send device identifier
-        if (body.deviceidentifier) {
-          // Device prefix will be added inside the device-repository
-          device = await deviceRepository.getDeviceById(userUuid, body.deviceidentifier);
-          if (device && device.get('pk') !== user.get('pk')) {
-            await device.destroyAsync();
-            device = null;
+          if(remember === 1) {
+            twofactorRememberToken = crypto.randomBytes(180).toString('base64');
+            device.set({
+              twofactorRemember: twofactorRememberToken
+            });
+          } else {
+            device.set({
+              twofactorRemember: null
+            });
           }
+
         }
 
-        if (!device) {
-          device = await deviceRepository.createDevice(userUuid, body.deviceidentifier);
-        }
+        
 
         // Browser extension sends body, web and mobile send header.
         // iOS sends lower case header with string value.
@@ -195,6 +219,7 @@ export const handler = async (event, context, callback) => {
       refresh_token: tokens.refreshToken,
       Key: user.get('key'),
       PrivateKey: privateKey ? privateKey.toString('utf8') : null,
+      TwoFactorToken: twofactorRememberToken || null
     }));
   } catch (e) {
     callback(null, utils.serverError('Internal error', e));

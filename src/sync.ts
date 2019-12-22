@@ -18,9 +18,12 @@ export const handler = async (event, context, callback) => {
   let ciphers;
   let folders;
   try {
-    // TODO await in parallel
-    ciphers = await cipherRepository.getAllCiphersByUserId(user.get('pk'));
-    folders = await folderRepository.getAllFoldersByUserId(user.get('pk'));
+    // This is the technique to make calls in parallel 
+    const ciphersPromise = cipherRepository.getAllCiphersByUserId(user.get('pk'));
+    const foldersPromise = folderRepository.getAllFoldersByUserId(user.get('pk'));
+
+    ciphers = await ciphersPromise;
+    folders = await foldersPromise;
   } catch (e) {
     callback(null, utils.serverError('Server error loading vault items', e));
     return;

@@ -82,6 +82,7 @@ export const Device: Model = dynogels.define('Device', {
         type: Joi.number(),
         pushToken: Joi.string().allow(null),
         refreshToken: Joi.string().allow(null),
+        twofactorRemember: Joi.string().allow(null),
     },
     indexes: [{
         hashKey: 'refreshToken', name: 'RefreshTokenDeviceIndex', type: 'global'
