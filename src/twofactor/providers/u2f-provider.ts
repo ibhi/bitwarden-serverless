@@ -133,6 +133,21 @@ export class U2fProvider extends BaseTwofactorProvider {
         }, params);
     }
 
+    async removeU2fRegistration(user: Item, index: number): Promise<Item> {
+        // Todo: Move this logic to user repository
+        let params: any = {};
+        params.UpdateExpression = `REMOVE #twofactors.u2f.#data[${index}]`;
+        params.ExpressionAttributeNames = {
+            '#twofactors' : 'twofactors',
+            '#data' : 'data',
+        };
+
+        return User.updateAsync({
+            pk: user.get(UserRepository.PARTITION_KEY),
+            sk: user.get(UserRepository.SORT_KEY),
+        }, params);
+    }
+
     private getU2fRegistrations(user: Item): U2FRegistration[] {
         const twofactor: Twofactor<U2FRegistration> = this.getTwofactor(user, TwoFactorType.U2f);
         return twofactor.data;

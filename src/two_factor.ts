@@ -7,6 +7,7 @@ import { genericTwofactorProvider } from './twofactor/providers/generic-twofacto
 import { Item } from 'dynogels';
 import { userRepository, UserRepository } from './db/user-repository';
 import { u2fProvider } from './twofactor/providers/u2f-provider';
+import { deflateRaw } from 'zlib';
 
 
 // Todo: make it configurable by the developer
@@ -527,4 +528,73 @@ export const activateU2f = async (event, context, callback) => {
     callback(null, utils.validationError("Error validating U2F token"));
     return;
   }
+}
+
+interface DeleteU2FData {
+  id: number | string,
+  masterpasswordhash: String,
+}
+
+// /two-factor/u2f DELETE
+export const deleteU2f = async (event, context, callback) => {
+  console.log('2FA delete u2f handler triggered', JSON.stringify(event, null, 2));
+
+  if (!event.body) {
+    callback(null, utils.validationError('Missing request body'));
+    return;
+  }
+
+  const body: DeleteU2FData = utils.normalizeBody(JSON.parse(event.body));
+
+  let user: Item;
+  try {
+    ({ user } = await loadContextFromHeader(event.headers.Authorization));
+    console.log('User uuid ' + user.get('pk'));
+  } catch (e) {
+    callback(null, utils.validationError('User not found: ' + e.message));
+    return;
+  }
+
+  if (!hashesMatch(user.get('passwordHash'), body.masterpasswordhash)) {
+    callback(null, utils.validationError('Invalid username or password'));
+    return;
+  }
+
+  let registrations: U2FRegistration[];
+
+  try {
+    // const [twofactor] = await genericTwofactorProvider.getTwofactorByType(user.get('uuid'), TwoFactorType.U2fRegisterChallenge);
+    const twofactor: Twofactor<U2FRegistration> = u2fProvider.getTwofactor(user, TwoFactorType.U2f);
+    registrations = twofactor.data;
+
+  } catch (error) {
+    callback(null, utils.serverError('U2F data not found!', error));
+    return;
+  }
+
+  try {
+    let index: number = registrations.findIndex(registration => registration.id = body.id);
+
+    await u2fProvider.removeU2fRegistration(user, index);
+
+    const keys = registrations
+      .filter(reg => reg.id != body.id)
+      .map(reg => ({
+        Id: reg.id,
+        Name: reg.name,
+        Compromised: reg.compromised
+      }));
+    
+    const result = {
+      Enabled: true,
+      Keys: keys,
+      Object: "twoFactorU2f"
+    }
+    callback(null, utils.okResponse(result));
+    return;
+  } catch (error) {
+    callback(null, utils.serverError('Error while deleting the registration!', error));
+    return;
+  }
+
 }

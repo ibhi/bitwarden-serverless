@@ -6,6 +6,12 @@ import { mapToUser } from './lib/mappers';
 
 export const handler = async (event, context, callback) => {
   console.log('Registration handler triggered', JSON.stringify(event, null, 2));
+
+  if (process.env.DISABLE_USER_REGISTRATION === 'true') {
+    callback(null, utils.validationError('Signups are not permitted'));
+    return;
+  }
+
   if (!event.body) {
     callback(null, utils.validationError('Missing request body'));
     return;
