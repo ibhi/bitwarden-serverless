@@ -12,6 +12,10 @@ plugins:
   - serverless-webpack
   - serverless-dynamodb-local
 custom:
+  apigwBinary:
+    types:
+      - 'multipart/form-data'
+      - '*/*'
   webpack:
     webpackConfig: 'webpack.config.js'
     includeModules: true
@@ -27,13 +31,19 @@ provider:
   memorySize: 256
   timeout: 10
   environment:
-    DEVICES_TABLE: ${self:service}-${self:provider.stage}-devices
-    USERS_TABLE: ${self:service}-${self:provider.stage}-users
-    CIPHERS_TABLE: ${self:service}-${self:provider.stage}-ciphers
-    FOLDERS_TABLE: ${self:service}-${self:provider.stage}-folders
-    TWOFACTOR_TABLE: ${self:service}-${self:provider.stage}-twofactor
     BITWARDEN_TABLE: ${self:service}-${self:provider.stage}-bitwarden
+    ATTACHMENTS_BUCKET: ${self:service}-${self:provider.stage}-v1-storage
+    STAGE: ${self:provider.stage}
   iamRoleStatements:
+    - Effect: 'Allow'
+      Action:
+        - 's3:GetObject'
+        - 's3:GetObjectAcl'
+        - 's3:PutObject'
+        - 's3:PutObjectAcl'
+        - 's3:DeleteObject'
+      Resource:
+        - "arn:aws:s3:::${self:provider.environment.ATTACHMENTS_BUCKET}/*"
     - Effect: Allow
       Action:
         - dynamodb:Query
@@ -43,11 +53,6 @@ provider:
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
       Resource:
-        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.DEVICES_TABLE}"
-        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.USERS_TABLE}"
-        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CIPHERS_TABLE}"
-        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.FOLDERS_TABLE}"
-        - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.TWOFACTOR_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}/index/UserEmailIndex"
         - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.BITWARDEN_TABLE}/index/InvertedIndex"
@@ -158,6 +163,27 @@ functions:
           method: delete
           <<: *default_cors
           path: api/ciphers/{uuid}
+  cipher_attachment_post:
+    handler: src/attachments.postHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/ciphers/{uuid}/attachment
+  cipher_attachment_delete:
+    handler: src/attachments.deleteHandler
+    events:
+      - http:
+          method: delete
+          <<: *default_cors
+          path: api/ciphers/{uuid}/attachment/{attachmentId}
+  cipher_attachment_get:
+    handler: src/attachments.getHandler
+    events:
+      - http:
+          method: get
+          <<: *default_cors
+          path: api/ciphers/{uuid}/attachment/{attachmentId}
   folder_post:
     handler: src/folders.postHandler
     events:
@@ -183,10 +209,6 @@ functions:
   #   handler: src/migrate.migrateHandler
   #   timeout: 300
   #   memorySize: 1024
-  # two_factor_setup:
-  #   handler: src/two_factor.setupHandler
-  # two_factor_complete:
-  #   handler: src/two_factor.completeHandler
   two_factor_get:
     handler: src/two_factor.getHandler
     events:
@@ -289,94 +311,6 @@ functions:
 
 resources:
   Resources:
-    UsersTable:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
-      Properties:
-        TableName: ${self:provider.environment.USERS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: uuid
-            AttributeType: S
-        KeySchema:
-          - AttributeName: uuid
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
-    DevicesTable:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
-      Properties:
-        TableName: ${self:provider.environment.DEVICES_TABLE}
-        AttributeDefinitions:
-          - AttributeName: uuid
-            AttributeType: S
-        KeySchema:
-          - AttributeName: uuid
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
-    CiphersTable:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
-      Properties:
-        TableName: ${self:provider.environment.CIPHERS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: userUuid
-            AttributeType: S
-          - AttributeName: uuid
-            AttributeType: S
-        KeySchema:
-          - AttributeName: userUuid
-            KeyType: HASH
-          - AttributeName: uuid
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 3
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
-    FoldersTable:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
-      Properties:
-        TableName: ${self:provider.environment.FOLDERS_TABLE}
-        AttributeDefinitions:
-          - AttributeName: userUuid
-            AttributeType: S
-          - AttributeName: uuid
-            AttributeType: S
-        KeySchema:
-          - AttributeName: userUuid
-            KeyType: HASH
-          - AttributeName: uuid
-            KeyType: RANGE
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
-    TwofactorTable:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
-      Properties:
-        TableName: ${self:provider.environment.TWOFACTOR_TABLE}
-        AttributeDefinitions:
-          - AttributeName: userUuid
-            AttributeType: S
-        KeySchema:
-          - AttributeName: userUuid
-            KeyType: HASH
-        ProvisionedThroughput:
-          ReadCapacityUnits: 1
-          WriteCapacityUnits: 1
-        PointInTimeRecoverySpecification:
-          PointInTimeRecoveryEnabled: true
     BitwardenTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
@@ -431,3 +365,14 @@ resources:
             ProvisionedThroughput:
               ReadCapacityUnits: 1
               WriteCapacityUnits: 1
+    AttachmentsBucket:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: ${self:service.tableDeletionPolicy.${self:provider.stage}, self:service.tableDeletionPolicy.other}
+      Properties:
+        VersioningConfiguration:
+          Status: Enabled
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: aws:kms
+        BucketName: ${self:provider.environment.ATTACHMENTS_BUCKET}

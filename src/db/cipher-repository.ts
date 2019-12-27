@@ -1,6 +1,13 @@
 import { ItemCollection, Item } from "dynogels";
 import { Cipher } from "./models";
 
+export interface AttachmentDocument {
+    uuid: string;
+    filename: string;
+    size: number;
+    key: string;
+}
+
 export class CipherRepository {
 
     static CIPHER_PREFIX: string = '::CIPHER::';
@@ -23,6 +30,41 @@ export class CipherRepository {
 
     createCipher(cipher: any): Promise<Item> {
         return Cipher.createAsync(cipher);
+    }
+
+    createAttachment(cipher: Item, attachment: AttachmentDocument): Promise<Item> {
+        const userId = cipher.get('pk');
+        const cipherId = cipher.get('sk');
+        let params: any = {};
+        params.UpdateExpression = `SET #attachments.#attachmentUuid = :attachment`;
+        params.ExpressionAttributeNames = {
+            '#attachments' : 'attachments',
+            '#attachmentUuid': attachment.uuid
+        };
+        params.ExpressionAttributeValues = {
+            ':attachment' : attachment,
+        };
+
+        return Cipher.updateAsync({
+            pk: userId,
+            sk: cipherId,
+        }, params);
+    }
+
+    deleteAttachment(cipher: Item, attachmentId: string) {
+        const userId = cipher.get('pk');
+        const cipherId = cipher.get('sk');
+        let params: any = {};
+        params.UpdateExpression = `REMOVE #attachments.#attachmentUuid`;
+        params.ExpressionAttributeNames = {
+            '#attachments' : 'attachments',
+            '#attachmentUuid': attachmentId
+        };
+
+        return Cipher.updateAsync({
+            pk: userId,
+            sk: cipherId,
+        }, params);
     }
 
 }

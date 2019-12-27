@@ -1,10 +1,43 @@
-import { Item } from "dynogels";
-import { generateSecret } from "./bitwarden";
-import { KDF_PBKDF2_ITERATIONS_DEFAULT } from "./crypto";
+import { Item } from 'dynogels';
+import { generateSecret } from './bitwarden';
+import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
 import { v4 as uuidV4 } from 'uuid';
-import { UserRepository } from "../db/user-repository";
+import { UserRepository } from '../db/user-repository';
+import S3 from 'aws-sdk/clients/s3';
+import prettyBytes from 'pretty-bytes';
+import Joi from '@hapi/joi';
+import { AttachmentDocument } from '../db/cipher-repository';
 
-export function mapCipher(cipher: Item) {
+const s3 = new S3();
+
+const mapAttachment = async (attachment: AttachmentDocument, cipher: Item, host: string) => {
+  const params = {
+    Bucket: process.env.ATTACHMENTS_BUCKET,
+    Key: cipher.get('sk') + '/' + attachment.uuid,
+    Expires: 604800, // 1 week
+  };
+  const url = `https://${host}/${process.env.STAGE}/api/ciphers/${cipher.get('sk')}/attachment/${attachment.uuid}`
+
+  return {
+    Id: attachment.uuid,
+    Url: url,
+    FileName: attachment.filename,
+    Key: attachment.key,
+    Size: attachment.size,
+    SizeName: prettyBytes(attachment.size),
+    Object: 'attachment',
+  };
+}
+
+const mapAttachments = (cipher: Item, host: string) => {
+  console.log('Cipher ', JSON.stringify(cipher));
+  const attachmentsObj: Map<string, AttachmentDocument> = cipher.get('attachments') || {};
+  return Object.keys(attachmentsObj) 
+    .map(key => attachmentsObj[key])
+    .map((attachment: AttachmentDocument) => mapAttachment(attachment, cipher, host));
+}
+
+export async function mapCipher(cipher: Item, host: string) {
   return {
     Id: cipher.get('sk'),
     Type: cipher.get('type'),
@@ -12,7 +45,7 @@ export function mapCipher(cipher: Item) {
     FolderId: cipher.get('folderUuid'),
     Favorite: cipher.get('favorite'),
     OrganizationId: cipher.get('organizationUuid'),
-    Attachments: cipher.get('attachments'),
+    Attachments: await Promise.all(mapAttachments(cipher, host)),
     OrganizationUseTotp: false,
     CollectionIds: [],
     Name: cipher.get('name'),

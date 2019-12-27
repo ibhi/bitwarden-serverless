@@ -9,7 +9,7 @@ import {
 import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
 import { userRepository } from '../db/user-repository';
 import { deviceRepository, DeviceRepository } from '../db/device-repository';
-import { CipherRepository } from '../db/cipher-repository';
+import { CipherRepository, AttachmentDocument } from '../db/cipher-repository';
 import { v4 as uuidV4 } from 'uuid';
 
 // Types
@@ -175,6 +175,15 @@ export function buildUserDocument(body) {
     premium: true,
     emailVerified: true, // Web-vault requires verified e-mail
     version: USER_MODEL_VERSION,
+  };
+}
+
+export function buildAttachmentDocument(attachment, attachmentKey): AttachmentDocument {
+  return {
+    uuid: attachment.id,
+    filename: attachment.filename,
+    size: attachment.size,
+    key: attachmentKey,
   };
 }
 

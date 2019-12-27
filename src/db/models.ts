@@ -106,7 +106,15 @@ export const Cipher: Model = dynogels.define('Cipher', {
         version: Joi.number().allow(null),
         data: Joi.object().allow(null),
         favorite: Joi.boolean(),
-        attachments: Joi.any().allow(null),
+        // attachments: Joi.object({ 
+        //     uuid:  {
+        //         uuid: Joi.string().required(),
+        //         filename: Joi.string().required(),
+        //         size: Joi.number().required(),
+        //         key: Joi.string(),
+        //     }
+        // }),
+        attachments: Joi.object().default({}),
         name: Joi.string().allow(null),
         notes: Joi.string().allow(null),
         fields: Joi.any().allow(null),
