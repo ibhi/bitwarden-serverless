@@ -3,14 +3,15 @@
 const { spawn } = require("child_process");
 
 const services = [
-  { path: "services/accounts-api"},
-  { path: "services/ciphers-api" },
-  { path: "services/fallback-api" },
-  { path: "services/folders-api" },
-  { path: "services/icons-api" },
-  { path: "services/login-api" },
-  { path: "services/sync-api" },
-  { path: "services/twofactor-api" },
+    { path: "ext-resources"},
+    { path: "services/accounts-api"},
+    { path: "services/ciphers-api" },
+    { path: "services/fallback-api" },
+    { path: "services/folders-api" },
+    { path: "services/icons-api" },
+    { path: "services/login-api" },
+    { path: "services/sync-api" },
+    { path: "services/twofactor-api" },
 ];
 
 // Start `sls offline` for each service
