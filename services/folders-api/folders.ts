@@ -1,7 +1,6 @@
 import * as utils from '../../libs/lib/api_utils';
 import { loadContextFromHeader, touch } from '../../libs/lib/bitwarden';
 import { mapFolder } from '../../libs/lib/mappers';
-import { Folder } from '../../libs/lib/models';
 import { folderRepository } from '../../libs/db/folder-repository';
 
 export const postHandler = async (event, context, callback) => {

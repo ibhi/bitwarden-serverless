@@ -4,8 +4,8 @@ import bufferEq from 'buffer-equal-constant-time';
 import entries from 'object.entries';
 import mapKeys from 'lodash/mapKeys';
 import {
-  User, Device, CIPHER_MODEL_VERSION, USER_MODEL_VERSION,
-} from './models';
+  CIPHER_MODEL_VERSION, USER_MODEL_VERSION,
+} from '../db/models';
 import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
 import { userRepository } from '../db/user-repository';
 import { deviceRepository, DeviceRepository } from '../db/device-repository';

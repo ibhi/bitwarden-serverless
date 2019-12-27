@@ -1,6 +1,7 @@
 import { normalizeBody, validationError, okResponse } from '../../libs/lib/api_utils';
-import { Cipher, Folder } from '../../libs/lib/models';
 import { loadContextFromHeader, buildCipherDocument, touch } from '../../libs/lib/bitwarden';
+import { folderRepository } from '../../libs/db/folder-repository';
+import { cipherRepository } from '../../libs/db/cipher-repository';
 
 // Todo: fix this code please!
 const MAX_RETRIES = 4;
@@ -75,11 +76,7 @@ export const postHandler = async (event, context, callback) => {
     return;
   }
 
-  const createFolder = (f, u) => (Folder
-    .createAsync({
-      name: f.name,
-      userUuid: u.get('uuid'),
-    })
+  const createFolder = (f, u) => (folderRepository.createFolder(u.get('pk'), f.name)
     .then(result => ({ success: true, result, model: f }))
     .catch(error => ({ success: false, error, model: f }))
   );
@@ -109,7 +106,7 @@ export const postHandler = async (event, context, callback) => {
   }
 
   const createCipher = cipher => (
-    Cipher.createAsync(cipher)
+    cipherRepository.createCipher(cipher)
       .then(result => ({ success: true, result, model: cipher }))
       .catch(error => ({ success: false, error, model: cipher }))
   );

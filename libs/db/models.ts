@@ -7,6 +7,11 @@ const usersTableName = process.env.BITWARDEN_TABLE;
 // Bind internal dynogels logger to console, it supports warn/info/error as needed
 dynogels.log = console;
 
+// The migration script runs updates on the models depending on each row's version
+// This is the latest version available for each model, new entries have this version
+export const CIPHER_MODEL_VERSION = 1;
+export const USER_MODEL_VERSION = 2;
+
 export const User: Model = dynogels.define('User', {
     hashKey: 'pk',
     rangeKey: 'sk',

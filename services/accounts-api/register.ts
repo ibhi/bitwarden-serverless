@@ -1,7 +1,5 @@
 import * as utils from '../../libs/lib/api_utils';
-import { User } from '../../libs/lib/models';
-import { buildUserDocument } from '../../libs/lib/bitwarden';
-import { userRepository, UserRepository } from '../../libs/db/user-repository';
+import { userRepository } from '../../libs/db/user-repository';
 import { mapToUser } from '../../libs/lib/mappers';
 
 export const handler = async (event, context, callback) => {
@@ -35,15 +33,6 @@ export const handler = async (event, context, callback) => {
   }
 
   try {
-    // const existingUser = await User.scan()
-    //   .where('email').equals(body.email.toLowerCase())
-    //   .select('COUNT')
-    //   .execAsync();
-
-    // if (existingUser.Count > 0) {
-    //   callback(null, utils.validationError('E-mail already taken'));
-    //   return;
-    // }
     const existingUser = await userRepository.getUserByEmail(body.email);
 
     if(existingUser) {
@@ -52,8 +41,6 @@ export const handler = async (event, context, callback) => {
     }
 
     await userRepository.createUser(mapToUser(body));
-
-    // await User.createAsync(buildUserDocument(body));
 
     callback(null, utils.okResponse(''));
   } catch (e) {
