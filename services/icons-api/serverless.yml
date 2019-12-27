@@ -1,0 +1,33 @@
+service: 
+  name: bitwarden-icons-api
+
+plugins:
+  - serverless-webpack
+
+custom: ${file(../../serverless.common.yml):custom}
+
+provider:
+  name: aws
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs10.x
+  memorySize: 256
+  timeout: 10
+  environment: ${file(../../serverless.common.yml):environment}
+  apiGateway:
+    restApiId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiId
+    restApiRootResourceId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiRootResourceId
+
+default_cors: &default_cors
+  cors: ${file(../../serverless.common.yml):cors}
+
+functions:
+  # Icons endpoints
+  icons:
+    handler: icons.handler
+    events:
+      - http:
+          method: get
+          path: /icons/{domain}/icon.png

@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+
+const { spawn } = require("child_process");
+
+const services = [
+  { path: "services/accounts-api"},
+  { path: "services/ciphers-api" },
+  { path: "services/fallback-api" },
+  { path: "services/folders-api" },
+  { path: "services/icons-api" },
+  { path: "services/login-api" },
+  { path: "services/sync-api" },
+  { path: "services/twofactor-api" },
+];
+
+// Start `sls offline` for each service
+services.forEach(service => {
+  const child = spawn(
+    "sls",
+    ["deploy", "--stage", "dev", "--region", "eu-central-1"],
+    { cwd: service.path }
+  );
+  child.stdout.setEncoding("utf8");
+  child.stdout.on("data", chunk => console.log(chunk));
+  child.stderr.on("data", chunk => console.log(chunk));
+  child.on("close", code => console.log(`child exited with code ${code}`));
+});

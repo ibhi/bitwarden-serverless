@@ -1,0 +1,112 @@
+service: 
+  name: bitwarden-twofactor-api
+
+plugins:
+  - serverless-webpack
+
+custom: ${file(../../serverless.common.yml):custom}
+
+provider:
+  name: aws
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs10.x
+  memorySize: 256
+  timeout: 10
+  environment: ${file(../../serverless.common.yml):environment}
+  apiGateway:
+    restApiId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiId
+    restApiRootResourceId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiRootResourceId
+    restApiResources:
+      '/api': 
+        Fn::ImportValue: 
+          ${self:provider.stage}-ExtApiGatewayRestApiResourceApiId
+
+  iamRoleStatements:
+    - ${file(../../serverless.common.yml):dynamodbRoleStatement}
+
+default_cors: &default_cors
+  cors: ${file(../../serverless.common.yml):cors}
+
+functions:
+  # Twofactor endpoints
+  two_factor_get:
+    handler: two_factor.getHandler
+    events:
+      - http:
+          method: get
+          <<: *default_cors
+          path: api/two-factor
+  two_factor_disable:
+    handler: two_factor.disableTwofactorHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/disable
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/disable
+  two_factor_get_authenticator:
+    handler: two_factor.getAuthenticatorHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-authenticator
+  two_factor_activate_authenticator:
+    handler: two_factor.activateAuthenticatorHandler
+    events:
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/authenticator
+  two_factor_get_recover:
+    handler: two_factor.getRecoveryCode
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-recover
+  two_factor_recover:
+    handler: two_factor.recover
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/recover
+  two_factor_getu2f:
+    handler: two_factor.getU2f
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-u2f
+  two_factor_getu2f_challenge:
+    handler: two_factor.generateU2fChallenge
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/get-u2f-challenge
+  two_factor_u2f:
+    handler: two_factor.activateU2f
+    events:
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/two-factor/u2f
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/two-factor/u2f
+  two_factor_delete_u2f:
+    handler: two_factor.deleteU2f
+    events:
+      - http:
+          method: delete
+          <<: *default_cors
+          path: api/two-factor/u2f

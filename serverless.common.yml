@@ -1,0 +1,76 @@
+
+plugins:
+  - serverless-webpack
+  - serverless-dynamodb-local
+custom:
+  apigwBinary:
+    types:
+      - 'multipart/form-data'
+      - '*/*'
+  webpack:
+    webpackConfig: 'webpack.config.js'
+    includeModules: true
+    # keepOutputDirectory: true
+  dynamodb:
+  # If you only want to use DynamoDB Local in some stages, declare them here
+    stages:
+      - dev
+
+environment:
+  BITWARDEN_TABLE: bitwarden-ext-resources-${self:provider.stage}-bitwarden
+  ATTACHMENTS_BUCKET: bitwarden-ext-resources-${self:provider.stage}-v1-storage
+  STAGE: ${self:provider.stage}
+
+cors:
+  origin: "*"
+  headers:
+    - Content-Type
+    - Authorization
+    - Accept
+    # Special serverless header being sent
+    - Device-type
+    - Pragma
+    - Cache-Control
+  allowMethods: "GET, POST, OPTIONS, PUT, DELETE"
+
+dynamodbRoleStatement:
+  Effect: Allow
+  Action:
+    - dynamodb:Query
+    - dynamodb:Scan
+    - dynamodb:GetItem
+    - dynamodb:PutItem
+    - dynamodb:UpdateItem
+    - dynamodb:DeleteItem
+  Resource:
+    - Fn::ImportValue: ${self:provider.stage}-BitwardenTableArn
+    - Fn::Join:
+      - ''
+      -
+        - Fn::ImportValue: ${self:provider.stage}-BitwardenTableArn
+        - /index/UserEmailIndex
+    - Fn::Join:
+      - ''
+      -
+        - Fn::ImportValue: ${self:provider.stage}-BitwardenTableArn
+        - /index/InvertedIndex
+    - Fn::Join:
+      - ''
+      -
+        - Fn::ImportValue: ${self:provider.stage}-BitwardenTableArn
+        - /index/RefreshTokenDeviceIndex
+
+attachmentsBucketRoleStatement:
+  Effect: 'Allow'
+  Action:
+    - 's3:GetObject'
+    - 's3:GetObjectAcl'
+    - 's3:PutObject'
+    - 's3:PutObjectAcl'
+    - 's3:DeleteObject'
+  Resource:
+    - Fn::Join:
+      - ''
+      -
+        - Fn::ImportValue: ${self:provider.stage}-AttachmentsBucketArn
+        - /*

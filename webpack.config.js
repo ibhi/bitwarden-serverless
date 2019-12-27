@@ -55,5 +55,7 @@ module.exports = {
       },
     ]
   },
-  plugins: [new ForkTsCheckerWebpackPlugin()]
+  plugins: [new ForkTsCheckerWebpackPlugin({
+    tsconfig: path.resolve(__dirname, 'tsconfig.json'),
+  })]
 };

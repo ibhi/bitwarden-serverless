@@ -1,5 +1,5 @@
-import { UserRepository } from '../../src/db/user-repository';
-import { User } from '../../src/db/models';
+import { UserRepository } from '../../libs/db/user-repository';
+import { User } from '../../libs/db/models';
 import { v4 as uuidV4 } from 'uuid';
 import { expect } from 'chai';
 import * as AWS from 'aws-sdk';
