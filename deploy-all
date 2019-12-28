@@ -3,7 +3,7 @@
 const { spawn } = require("child_process");
 
 const services = [
-    { path: "ext-resources"},
+    // { path: "ext-resources"},
     { path: "services/accounts-api"},
     { path: "services/ciphers-api" },
     { path: "services/fallback-api" },

@@ -1,7 +1,11 @@
 import * as utils from '../../libs/lib/api_utils';
 import { loadContextFromHeader, buildCipherDocument, touch } from '../../libs/lib/bitwarden';
 import { mapCipher } from '../../libs/lib/mappers';
-import { cipherRepository } from '../../libs/db/cipher-repository';
+import { cipherRepository, AttachmentDocument } from '../../libs/db/cipher-repository';
+import { UserRepository } from '../../libs/db/user-repository';
+import S3 from 'aws-sdk/clients/s3';
+
+const s3 = new S3();
 
 export const postHandler = async (event, context, callback) => {
   console.log('Cipher create handler triggered', JSON.stringify(event, null, 2));
@@ -101,6 +105,18 @@ export const deleteHandler = async (event, context, callback) => {
   }
 
   try {
+    const attachments: {[key: string]: AttachmentDocument} = (await cipherRepository
+        .getCipherById(user.get(UserRepository.PARTITION_KEY), cipherUuid)
+      ).get('attachments') || {};
+    // Delete all attachments belonging to the cipher from s3 before deleting the cipher
+    await Promise.all(Object.keys(attachments)
+      .map(key => attachments[key])
+      .map(async attachment => await s3.deleteObject({
+          Bucket: process.env.ATTACHMENTS_BUCKET || '',
+          Key: cipherUuid + '/' + attachment.uuid,
+        }).promise()
+      ));
+
     await cipherRepository.deleteCipherById(user.get('pk'), cipherUuid);
     await touch(user);
 
