@@ -79,6 +79,15 @@ resources:
             - ServerSideEncryptionByDefault:
                 SSEAlgorithm: aws:kms
         BucketName: ${self:provider.environment.ATTACHMENTS_BUCKET}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: 
+                - Authorization
+              AllowedMethods: 
+                - GET
+              AllowedOrigins:
+                - '*'
+              MaxAge: 3000
 
   Outputs:
     BitwardenTableArn:

@@ -3,6 +3,7 @@ service:
 
 plugins:
   - serverless-webpack
+  - serverless-apigw-binary
 
 custom: ${file(../../serverless.common.yml):custom}
 

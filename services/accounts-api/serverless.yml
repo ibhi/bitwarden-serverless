@@ -59,6 +59,13 @@ functions:
           method: post
           <<: *default_cors
           path: api/accounts/register
+  accounts_revision_date:
+    handler: accounts.revisionDateHandler
+    events:
+      - http:
+          method: get
+          <<: *default_cors
+          path: api/accounts/revision-date
 
 resources:
   - Outputs:

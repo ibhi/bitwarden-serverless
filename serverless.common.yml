@@ -6,7 +6,6 @@ custom:
   apigwBinary:
     types:
       - 'multipart/form-data'
-      - '*/*'
   webpack:
     webpackConfig: 'webpack.config.js'
     includeModules: true

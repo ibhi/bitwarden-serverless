@@ -1,11 +1,11 @@
-import { ItemCollection, Item } from "dynogels";
+import { Item } from "dynogels";
 import { Cipher } from "./models";
 
 export interface AttachmentDocument {
     uuid: string;
     filename: string;
     size: number;
-    key: string;
+    key?: string;
 }
 
 export class CipherRepository {

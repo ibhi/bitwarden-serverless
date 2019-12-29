@@ -16,7 +16,6 @@ export const handler = async (event, context, callback) => {
   }
   let ciphers;
   let folders;
-  const host = event.headers.Host;
   try {
     // This is the technique to make calls in parallel 
     const ciphersPromise = cipherRepository.getAllCiphersByUserId(user.get('pk'));
@@ -32,7 +31,7 @@ export const handler = async (event, context, callback) => {
   const response = {
     Profile: mapUser(user),
     Folders: folders.map(mapFolder),
-    Ciphers: await Promise.all(ciphers.map(cipher => mapCipher(cipher, host))),
+    Ciphers: await Promise.all(ciphers.map(cipher => mapCipher(cipher))),
     Collections: [],
     Domains: {
       EquivalentDomains: null,
