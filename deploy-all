@@ -1,28 +1,56 @@
 #!/usr/bin/env node
 
 const { spawn } = require("child_process");
+const path = require('path');
 
-const services = [
-    // { path: "ext-resources"},
-    { path: "services/accounts-api"},
-    { path: "services/ciphers-api" },
-    { path: "services/fallback-api" },
-    { path: "services/folders-api" },
-    { path: "services/icons-api" },
-    { path: "services/login-api" },
-    { path: "services/sync-api" },
-    { path: "services/twofactor-api" },
-];
+const DEFAULT_STAGE = 'dev';
+const DEFAULT_REGION = 'eu-central-1';
 
-// Start `sls offline` for each service
-services.forEach(service => {
+const deployWithPromise = (stage, region, cwd) => new Promise((resolve) => {
   const child = spawn(
     "sls",
-    ["deploy", "--stage", "dev", "--region", "eu-central-1"],
-    { cwd: service.path }
+    ["deploy", "--stage", stage, "--region", region],
+    { cwd:  cwd}
   );
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", chunk => console.log(chunk));
   child.stderr.on("data", chunk => console.log(chunk));
-  child.on("close", code => console.log(`child exited with code ${code}`));
+  child.on("close", code => {
+    console.log(`child exited with code ${code}`);
+    resolve(code);
+  });
 });
+
+const extResourcesPath = path.resolve(__dirname, 'ext-resources');
+const deployExtResources = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 
+  deployWithPromise(stage, region, extResourcesPath);
+
+const accountsApiPath = path.resolve(__dirname, 'services/accounts-api');
+const deployAccountsApi = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 
+deployWithPromise(stage, region, accountsApiPath);
+
+
+const services = [
+    { path: path.resolve(__dirname, "services/ciphers-api") },
+    { path: path.resolve(__dirname, "services/fallback-api") },
+    { path: path.resolve(__dirname, "services/folders-api") },
+    { path: path.resolve(__dirname, "services/icons-api") },
+    { path: path.resolve(__dirname, "services/login-api") },
+    { path: path.resolve(__dirname, "services/sync-api") },
+    { path: path.resolve(__dirname, "services/twofactor-api") },
+];
+
+const deployOtherApis = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 
+  services.map(service => deployWithPromise(stage, region, service.path));
+
+const deployAll = async() => {
+  // First deploy external resources like dynamodb, s3 etc
+  await deployExtResources(DEFAULT_STAGE, DEFAULT_REGION);
+  // Next deploy accounts api, which will create the API Gateway and export it
+  // to other services
+  await deployAccountsApi(DEFAULT_STAGE, DEFAULT_REGION);
+  // Then deploy all other services in parallel
+  await Promise.all(deployOtherApis(DEFAULT_STAGE, DEFAULT_REGION));
+}
+
+deployAll();
