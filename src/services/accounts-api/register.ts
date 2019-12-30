@@ -1,8 +1,8 @@
 import * as utils from '../../libs/lib/api_utils';
 import { userRepository } from '../../libs/db/user-repository';
-import { mapToUser } from '../../libs/lib/mappers';
 
-export const handler = async (event, context, callback) => {
+// eslint-disable-next-line
+export const handler = async (event, context, callback): Promise<void> => {
   console.log('Registration handler triggered', JSON.stringify(event, null, 2));
 
   if (process.env.DISABLE_USER_REGISTRATION === 'true') {
@@ -35,12 +35,12 @@ export const handler = async (event, context, callback) => {
   try {
     const existingUser = await userRepository.getUserByEmail(body.email);
 
-    if(existingUser) {
+    if (existingUser) {
       callback(null, utils.validationError('E-mail already taken'));
       return;
     }
 
-    await userRepository.createUser(mapToUser(body));
+    await userRepository.createUser(userRepository.mapToUser(body));
 
     callback(null, utils.okResponse(''));
   } catch (e) {

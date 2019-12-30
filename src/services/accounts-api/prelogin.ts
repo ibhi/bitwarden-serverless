@@ -2,7 +2,8 @@ import { KDF_PBKDF2, KDF_PBKDF2_ITERATIONS_DEFAULT } from '../../libs/lib/crypto
 import * as utils from '../../libs/lib/api_utils';
 import { userRepository } from '../../libs/db/user-repository';
 
-export const handler = async (event, context, callback) => {
+// eslint-disable-next-line
+export const handler = async (event, context, callback): Promise<void> => {
   console.log('Prelogin handler triggered', JSON.stringify(event, null, 2));
 
   if (!event.body) {

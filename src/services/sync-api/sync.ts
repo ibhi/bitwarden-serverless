@@ -4,7 +4,8 @@ import { mapUser, mapCipher, mapFolder } from '../../libs/lib/mappers';
 import { cipherRepository } from '../../libs/db/cipher-repository';
 import { folderRepository } from '../../libs/db/folder-repository';
 
-export const handler = async (event, context, callback) => {
+// eslint-disable-next-line import/prefer-default-export
+export const handler = async (event, context, callback): Promise<void> => {
   console.log('Sync handler triggered', JSON.stringify(event, null, 2));
 
   let user;
@@ -17,7 +18,7 @@ export const handler = async (event, context, callback) => {
   let ciphers;
   let folders;
   try {
-    // This is the technique to make calls in parallel 
+    // This is the technique to make calls in parallel
     const ciphersPromise = cipherRepository.getAllCiphersByUserId(user.get('pk'));
     const foldersPromise = folderRepository.getAllFoldersByUserId(user.get('pk'));
 
@@ -31,7 +32,7 @@ export const handler = async (event, context, callback) => {
   const response = {
     Profile: mapUser(user),
     Folders: folders.map(mapFolder),
-    Ciphers: await Promise.all(ciphers.map(cipher => mapCipher(cipher))),
+    Ciphers: await Promise.all(ciphers.map((cipher) => mapCipher(cipher))),
     Collections: [],
     Domains: {
       EquivalentDomains: null,

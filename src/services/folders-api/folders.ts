@@ -3,7 +3,7 @@ import { loadContextFromHeader, touch } from '../../libs/lib/bitwarden';
 import { mapFolder } from '../../libs/lib/mappers';
 import { folderRepository } from '../../libs/db/folder-repository';
 
-export const postHandler = async (event, context, callback) => {
+export const postHandler = async (event, context, callback): Promise<void> => {
   console.log('Folder create handler triggered', JSON.stringify(event, null, 2));
 
   if (!event.body) {
@@ -17,7 +17,7 @@ export const postHandler = async (event, context, callback) => {
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('User not found: ' + e.message));
+    callback(null, utils.validationError(`User not found: ${e.message}`));
     return;
   }
 
@@ -36,7 +36,7 @@ export const postHandler = async (event, context, callback) => {
   }
 };
 
-export const putHandler = async (event, context, callback) => {
+export const putHandler = async (event, context, callback): Promise<void> => {
   console.log('Folder edit handler triggered', JSON.stringify(event, null, 2));
   if (!event.body) {
     callback(null, utils.validationError('Missing request body'));
@@ -49,7 +49,7 @@ export const putHandler = async (event, context, callback) => {
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('Cannot load user from access token: ' + e));
+    callback(null, utils.validationError(`Cannot load user from access token: ${e}`));
     return;
   }
 
@@ -82,7 +82,7 @@ export const putHandler = async (event, context, callback) => {
   }
 };
 
-export const deleteHandler = async (event, context, callback) => {
+export const deleteHandler = async (event, context, callback): Promise<void> => {
   console.log('Folder delete handler triggered', JSON.stringify(event, null, 2));
 
   let user;

@@ -23,7 +23,13 @@ export const CORS_HEADERS = {
   'access-control-allow-headers': 'Content-Type,Authorization,Accept,Device-type,Pragma,Cache-Control',
 };
 
-export function okResponse(body) {
+export interface LambdaHttpResponse {
+  statusCode: number;
+  headers: { [key: string]: string };
+  body: string;
+}
+
+export function okResponse(body): LambdaHttpResponse {
   console.log('Success response', { body });
   return {
     statusCode: 200,
@@ -32,7 +38,7 @@ export function okResponse(body) {
   };
 }
 
-export function validationError(message) {
+export function validationError(message): LambdaHttpResponse {
   console.log('Validation error', { message });
   return {
     statusCode: 400,
@@ -48,7 +54,7 @@ export function validationError(message) {
   };
 }
 
-export function serverError(message, error) {
+export function serverError(message, error): LambdaHttpResponse {
   console.log('Server error', { message, error });
   return {
     statusCode: 500,

@@ -18,18 +18,17 @@ export const KDF_PBKDF2_ITERATIONS_MAX = 1000000;
  * Bitwarden format of storing ciphers
  */
 export class CipherString {
-  constructor(public type: string | number, public iv: string, public ciphertext: string, public mac: string | null = null) {
-    // this.type = type;
-    // this.iv = iv;
-    // this.ciphertext = ciphertext;
-    // this.mac = mac;
-  }
+  constructor(
+    public type: string | number,
+    public iv: string, public ciphertext: string,
+    public mac: string | null = null,
+  ) {}
 
-  static fromString(string) {
+  static fromString(string): CipherString {
     const match = string.match(/^(\d)\.([^|]+)\|(.+)$/);
 
     if (!match) {
-      throw new Error('Invalid CipherString: ' + string);
+      throw new Error(`Invalid CipherString: ${string}`);
     }
 
     const type = parseInt(match[1], 10);
@@ -39,87 +38,26 @@ export class CipherString {
     return new CipherString(type, iv, ciphertext, mac);
   }
 
-  toString() {
-    return [this.type + '.' + this.iv, this.ciphertext, this.mac]
-      .filter(v => !!v)
+  toString(): string {
+    return [`${this.type}.${this.iv}`, this.ciphertext, this.mac]
+      .filter((v) => !!v)
       .join('|');
   }
 }
 
-export async function makeKeyAsync(
-  password,
-  salt,
-  kdf = KDF_PBKDF2,
-  iterations = KDF_PBKDF2_ITERATIONS_DEFAULT,
-) {
-  return new Promise<Buffer>((resolve, reject) => {
-    switch (kdf) {
-      case KDF_PBKDF2:
-        if (iterations < KDF_PBKDF2_ITERATIONS_MIN || iterations > KDF_PBKDF2_ITERATIONS_MAX) {
-          throw new Error('PBKDF2 iteration count must be between ' + KDF_PBKDF2_ITERATIONS_MIN + ' and ' + KDF_PBKDF2_ITERATIONS_MAX);
-        }
-        crypto.pbkdf2(password, salt, iterations, 256 / 8, 'sha256', (err, derivedKey) => {
-          if (err) {
-            reject(err);
-            return;
-          }
+export function macsEqual(macKey, left, right): boolean {
+  const leftMac = crypto.createHmac('sha256', macKey)
+    .update(left)
+    .digest('hex');
 
-          resolve(derivedKey);
-        });
-        break;
-      default:
-        throw new Error('Unknown KDF type: ' + kdf);
-    }
-  });
+  const rightMac = crypto.createHmac('sha256', macKey)
+    .update(right)
+    .digest('hex');
+
+  return leftMac === rightMac;
 }
 
-export function makeEncryptionKey(key) {
-  const plaintext = crypto.randomBytes(64);
-  const iv = crypto.randomBytes(16);
-
-  const cipher = crypto.createCipheriv('AES-256-CBC', key, iv);
-
-  const ciphertext = Buffer.concat([
-    cipher.update(plaintext),
-    cipher.final(),
-  ]);
-
-  return new CipherString(
-    TYPE_AESCBC256_B64,
-    iv.toString('base64'),
-    ciphertext.toString('base64'),
-  ).toString();
-}
-
-export async function hashPasswordAsync(
-  password,
-  salt,
-  kdf = KDF_PBKDF2,
-  iterations = KDF_PBKDF2_ITERATIONS_DEFAULT,
-) {
-  const key = await makeKeyAsync(password, salt, kdf, iterations);
-
-  return new Promise((resolve, reject) => {
-    // Only 1 interation, since stretching has been applied in makeKey
-    crypto.pbkdf2(key, password, 1, 256 / 8, 'sha256', (err, derivedKey) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-
-      resolve(derivedKey.toString('base64'));
-    });
-  });
-}
-
-export function encryptWithMasterPasswordKey(data, userKey, masterKey) {
-  // Decrypt the encrypted key stored on the user table to get the user key
-  const encKey = Buffer.from(decrypt(userKey, masterKey));
-
-  return encrypt(data.toString(), encKey);
-}
-
-export function encrypt(plaintext, mergedKey) {
+export function encrypt(plaintext, mergedKey): CipherString {
   const key = mergedKey.slice(0, 32);
   const macKey = mergedKey.slice(32, 64);
   const iv = crypto.randomBytes(16);
@@ -144,14 +82,7 @@ export function encrypt(plaintext, mergedKey) {
   );
 }
 
-export function decryptWithMasterPasswordKey(data, userKey, masterKey) {
-  // Decrypt the encrypted key stored on the user table to get the user key
-  const encKey = decrypt(userKey, masterKey);
-
-  return decrypt(data.toString(), encKey).toString('utf-8');
-}
-
-export function decrypt(rawString, mergedKey) {
+export function decrypt(rawString, mergedKey): Buffer {
   const key = mergedKey.slice(0, 32);
   const macKey = mergedKey.slice(32, 64);
   const cipherString = CipherString.fromString(rawString);
@@ -184,18 +115,86 @@ export function decrypt(rawString, mergedKey) {
       ]);
     }
     default:
-      throw new Error('Unimplemented cipher for decryption: ' + cipherString.type);
+      throw new Error(`Unimplemented cipher for decryption: ${cipherString.type}`);
   }
 }
 
-export function macsEqual(macKey, left, right) {
-  const leftMac = crypto.createHmac('sha256', macKey)
-    .update(left)
-    .digest('hex');
+export async function makeKeyAsync(
+  password,
+  salt,
+  kdf = KDF_PBKDF2,
+  iterations = KDF_PBKDF2_ITERATIONS_DEFAULT,
+): Promise<Buffer> {
+  return new Promise<Buffer>((resolve, reject) => {
+    switch (kdf) {
+      case KDF_PBKDF2:
+        if (iterations < KDF_PBKDF2_ITERATIONS_MIN || iterations > KDF_PBKDF2_ITERATIONS_MAX) {
+          throw new Error(`PBKDF2 iteration count must be between ${KDF_PBKDF2_ITERATIONS_MIN} and ${KDF_PBKDF2_ITERATIONS_MAX}`);
+        }
+        crypto.pbkdf2(password, salt, iterations, 256 / 8, 'sha256', (err, derivedKey) => {
+          if (err) {
+            reject(err);
+            return;
+          }
 
-  const rightMac = crypto.createHmac('sha256', macKey)
-    .update(right)
-    .digest('hex');
+          resolve(derivedKey);
+        });
+        break;
+      default:
+        throw new Error(`Unknown KDF type: ${kdf}`);
+    }
+  });
+}
 
-  return leftMac === rightMac;
+export function makeEncryptionKey(key): string {
+  const plaintext = crypto.randomBytes(64);
+  const iv = crypto.randomBytes(16);
+
+  const cipher = crypto.createCipheriv('AES-256-CBC', key, iv);
+
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext),
+    cipher.final(),
+  ]);
+
+  return new CipherString(
+    TYPE_AESCBC256_B64,
+    iv.toString('base64'),
+    ciphertext.toString('base64'),
+  ).toString();
+}
+
+export async function hashPasswordAsync(
+  password,
+  salt,
+  kdf = KDF_PBKDF2,
+  iterations = KDF_PBKDF2_ITERATIONS_DEFAULT,
+): Promise<string> {
+  const key = await makeKeyAsync(password, salt, kdf, iterations);
+
+  return new Promise<string>((resolve, reject) => {
+    // Only 1 interation, since stretching has been applied in makeKey
+    crypto.pbkdf2(key, password, 1, 256 / 8, 'sha256', (err, derivedKey) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      resolve(derivedKey.toString('base64'));
+    });
+  });
+}
+
+export function encryptWithMasterPasswordKey(data, userKey, masterKey): CipherString {
+  // Decrypt the encrypted key stored on the user table to get the user key
+  const encKey = Buffer.from(decrypt(userKey, masterKey));
+
+  return encrypt(data.toString(), encKey);
+}
+
+export function decryptWithMasterPasswordKey(data, userKey, masterKey): string {
+  // Decrypt the encrypted key stored on the user table to get the user key
+  const encKey = decrypt(userKey, masterKey);
+
+  return decrypt(data.toString(), encKey).toString('utf-8');
 }

@@ -1,18 +1,77 @@
 import { Item } from 'dynogels';
-import { generateSecret } from './bitwarden';
-import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
-import { v4 as uuidV4 } from 'uuid';
-import { UserRepository } from '../db/user-repository';
 import prettyBytes from 'pretty-bytes';
-import { AttachmentDocument } from '../db/cipher-repository';
 import { S3 } from 'aws-sdk';
+import {
+  AttachmentDocument, Fields, Login,
+} from '../db/cipher-repository';
 
 const s3 = new S3();
 
-const mapAttachment = async (attachment: AttachmentDocument, cipher: Item) => {
+export interface AttachmentResponse {
+  Id: string;
+  Url: string;
+  FileName: string;
+  Key: string;
+  Size: number;
+  SizeName: string;
+  Object: 'attachment';
+}
+
+export interface CipherResponse {
+  Id: string;
+  Type: number;
+  RevisionDate: string;
+  FolderId?: string;
+  Favorite: boolean;
+  OrganizationId?: string;
+  Attachments?: AttachmentResponse[];
+  OrganizationUseTotp: boolean;
+  CollectionIds: [];
+  Name: string;
+  Notes: string;
+  Fields: Fields[];
+  Login: Login;
+  Card: object;
+  Identity: object;
+  SecureNote: object;
+  Object: 'cipher';
+}
+
+export interface UserResponse {
+  Id: string;
+  Name: string;
+  Email: string;
+  EmailVerified: boolean;
+  Premium: boolean;
+  MasterPasswordHint: string;
+  Culture: string;
+  TwoFactorEnabled: boolean;
+  Key: string;
+  PrivateKey: string;
+  SecurityStamp: string;
+  Organizations: [];
+  Object: 'profile';
+}
+
+export interface FolderResponse {
+  Id: string;
+  Name: string;
+  RevisionDate: string;
+  Object: 'folder';
+}
+
+function getRevisionDate(object: Item): string {
+  // dynogels sets updated at only after update
+  return object.get('updatedAt') || object.get('createdAt');
+}
+
+const mapAttachment = async (
+  attachment: AttachmentDocument,
+  cipher: Item,
+): Promise<AttachmentResponse> => {
   const params = {
     Bucket: process.env.ATTACHMENTS_BUCKET,
-    Key: cipher.get('sk') + '/' + attachment.uuid,
+    Key: `${cipher.get('sk')}/${attachment.uuid}`,
     Expires: 604800, // 1 week
   };
 
@@ -27,16 +86,16 @@ const mapAttachment = async (attachment: AttachmentDocument, cipher: Item) => {
     SizeName: prettyBytes(attachment.size),
     Object: 'attachment',
   };
-}
+};
 
-const mapAttachments = (cipher: Item) => {
+const mapAttachments = (cipher: Item): Promise<AttachmentResponse>[] => {
   const attachmentsObj: Map<string, AttachmentDocument> = cipher.get('attachments') || {};
-  return Object.keys(attachmentsObj) 
-    .map(key => attachmentsObj[key])
+  return Object.keys(attachmentsObj)
+    .map((key) => attachmentsObj[key])
     .map((attachment: AttachmentDocument) => mapAttachment(attachment, cipher));
-}
+};
 
-export async function mapCipher(cipher: Item) {
+export async function mapCipher(cipher: Item): Promise<CipherResponse> {
   return {
     Id: cipher.get('sk'),
     Type: cipher.get('type'),
@@ -58,7 +117,7 @@ export async function mapCipher(cipher: Item) {
   };
 }
 
-export function mapUser(user: Item) {
+export function mapUser(user: Item): UserResponse {
   return {
     Id: user.get('pk'),
     Name: user.get('name'),
@@ -76,7 +135,7 @@ export function mapUser(user: Item) {
   };
 }
 
-export function mapFolder(folder: Item) {
+export function mapFolder(folder: Item): FolderResponse {
   return {
     Id: folder.get('sk'),
     Name: folder.get('name'),
@@ -85,37 +144,6 @@ export function mapFolder(folder: Item) {
   };
 }
 
-export function mapToUser(body) {
-  const userId = `${UserRepository.USER_PREFIX}${uuidV4()}`
-  let encryptedPrivateKey, publicKey;
-  if(body.keys) {
-      encryptedPrivateKey = body.keys.encryptedPrivateKey;
-      publicKey = body.keys.publicKey;
-  }
-  return {
-      pk: userId,
-      sk: userId,
-      email: body.email.toLowerCase(),
-      passwordHash: body.masterpasswordhash,
-      passwordHint: body.masterpasswordhint,
-      name: body.name,
-      kdfIterations: body.kdfiterations || KDF_PBKDF2_ITERATIONS_DEFAULT,
-      kdfType: body.kdf,
-      key: body.key,
-      privateKey: encryptedPrivateKey,
-      publicKey,
-      jwtSecret: generateSecret(),
-      culture: 'en-US', // Hard-coded unless supplied from elsewhere
-      premium: true,
-      emailVerified: true, // Web-vault requires verified e-mail
-  };
-}
-
-export function getRevisionDateAsMillis(object) {
+export function getRevisionDateAsMillis(object): number {
   return (new Date(getRevisionDate(object))).getTime();
-}
-
-function getRevisionDate(object) {
-  // dynogels sets updated at only after update
-  return object.get('updatedAt') || object.get('createdAt');
 }

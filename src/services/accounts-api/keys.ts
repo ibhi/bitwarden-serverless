@@ -2,7 +2,8 @@ import querystring from 'querystring';
 import * as utils from '../../libs/lib/api_utils';
 import { regenerateTokens, loadContextFromHeader, DEFAULT_VALIDITY } from '../../libs/lib/bitwarden';
 
-export const handler = async (event, context, callback) => {
+// eslint-disable-next-line
+export const handler = async (event, context, callback): Promise<void> => {
   console.log('Keys handler triggered', JSON.stringify(event, null, 2));
   if (!event.body) {
     callback(null, utils.validationError('Missing request body'));
@@ -22,7 +23,7 @@ export const handler = async (event, context, callback) => {
   try {
     ({ user, device } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('User not found: ' + e.message));
+    callback(null, utils.validationError(`User not found: ${e.message}`));
     return;
   }
 

@@ -1,16 +1,16 @@
+import { Item } from 'dynogels';
 import * as utils from '../../libs/lib/api_utils';
 import { loadContextFromHeader } from '../../libs/lib/bitwarden';
 import { getRevisionDateAsMillis, mapUser } from '../../libs/lib/mappers';
-import { Item } from 'dynogels';
 
-export const profileHandler = async (event, context, callback) => {
+export const profileHandler = async (event, context, callback): Promise<void> => {
   console.log('Account profile handler triggered', JSON.stringify(event, null, 2));
 
   let user: Item;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('User not found: ' + e.message));
+    callback(null, utils.validationError(`User not found: ${e.message}`));
     return;
   }
 
@@ -21,14 +21,14 @@ export const profileHandler = async (event, context, callback) => {
   }
 };
 
-export const putProfileHandler = async (event, context, callback) => {
+export const putProfileHandler = async (event, context, callback): Promise<void> => {
   console.log('Update account profile handler triggered', JSON.stringify(event, null, 2));
 
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('User not found: ' + e.message));
+    callback(null, utils.validationError(`User not found: ${e.message}`));
   }
 
   const body = utils.normalizeBody(JSON.parse(event.body));
@@ -48,14 +48,14 @@ export const putProfileHandler = async (event, context, callback) => {
   }
 };
 
-export const revisionDateHandler = async (event, context, callback) => {
+export const revisionDateHandler = async (event, context, callback): Promise<void> => {
   console.log('Account revision date handler triggered', JSON.stringify(event, null, 2));
 
   let user;
   try {
     ({ user } = await loadContextFromHeader(event.headers.Authorization));
   } catch (e) {
-    callback(null, utils.validationError('User not found: ' + e.message));
+    callback(null, utils.validationError(`User not found: ${e.message}`));
   }
 
   try {

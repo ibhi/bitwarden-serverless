@@ -22,10 +22,26 @@ module.exports = (path, nodeExternals, slsw, ForkTsCheckerWebpackPlugin, isLocal
   target: 'node',
   module: {
     rules: [
+      {
+        enforce: 'pre',
+        test: /\.ts$/,
+        exclude: [
+          [
+            path.resolve(process.cwd(), 'node_modules'),
+            path.resolve(process.cwd(), '.serverless'),
+            path.resolve(process.cwd(), '.webpack'),
+          ],
+        ],
+        loader: 'eslint-loader',
+        options: {
+          cache: true,
+          fix: true,
+          failOnError: true,
+        },
+      },
       // all files with a `.ts` or `.tsx` extension will be handled by `ts-loader`
       {
         test: /\.(tsx?)$/,
-        // loader: 'ts-loader',
         exclude: [
           [
             path.resolve(process.cwd(), 'node_modules'),

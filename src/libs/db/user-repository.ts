@@ -1,71 +1,123 @@
-import { Item } from "dynogels";
-import { User } from "./models";
-import { TwoFactorTypeKey, Twofactor } from "../../services/twofactor-api/models";
-import { encode } from "hi-base32";
+import { Item, UpdateItemOptions } from 'dynogels';
+import { encode } from 'hi-base32';
 import crypto from 'crypto';
+import { v4 as uuidV4 } from 'uuid';
+import { User, USER_MODEL_VERSION } from './models';
+import { TwoFactorTypeKey, Twofactor } from '../../services/twofactor-api/models';
+import { KDF_PBKDF2_ITERATIONS_DEFAULT } from '../lib/crypto';
+
+export interface UserDocument {
+  pk: string;
+  sk: string;
+  email: string;
+  passwordHash: string;
+  passwordHint: string;
+  name: string;
+  kdfIterations: number;
+  kdfType: number;
+  key: string;
+  privateKey: string;
+  publicKey: string;
+  jwtSecret: string;
+  culture: 'en-US'; // Hard-coded unless supplied from elsewhere
+  premium: boolean;
+  emailVerified: boolean; // Web-vault requires verified e-mail
+  version: number;
+}
 
 export class UserRepository {
+  static USER_PREFIX = 'USER::';
 
-    static USER_PREFIX = 'USER::';
+  static PARTITION_KEY = 'pk';
 
-    static PARTITION_KEY = 'pk';
-    static  SORT_KEY = 'sk';
+  static SORT_KEY = 'sk';
 
-    createUser(user: any): Promise<Item> {
-        return User.createAsync(user);
+  mapToUser(body): UserDocument {
+    const userId = `${UserRepository.USER_PREFIX}${uuidV4()}`;
+    let encryptedPrivateKey; let
+      publicKey;
+    if (body.keys) {
+      encryptedPrivateKey = body.keys.encryptedPrivateKey;
+      publicKey = body.keys.publicKey;
     }
+    return {
+      pk: userId,
+      sk: userId,
+      email: body.email.toLowerCase(),
+      passwordHash: body.masterpasswordhash,
+      passwordHint: body.masterpasswordhint,
+      name: body.name,
+      kdfIterations: body.kdfiterations || KDF_PBKDF2_ITERATIONS_DEFAULT,
+      kdfType: body.kdf,
+      key: body.key,
+      privateKey: encryptedPrivateKey,
+      publicKey,
+      jwtSecret: this.generateSecret(),
+      culture: 'en-US', // Hard-coded unless supplied from elsewhere
+      premium: true,
+      emailVerified: true, // Web-vault requires verified e-mail,
+      version: USER_MODEL_VERSION,
+    };
+  }
 
-    getUserById(userUuid: string): Promise<Item> {
-        return User.getAsync(userUuid, userUuid);
-    }
+  createUser(user: UserDocument): Promise<Item> {
+    return User.createAsync(user);
+  }
 
-    async getUserByEmail(email: string): Promise<Item> {
-        const [user] = (await User.query(email.toLowerCase())
-            .usingIndex('UserEmailIndex')
-            .execAsync()).Items;
-        return user;
-    }
+  getUserById(userUuid: string): Promise<Item> {
+    return User.getAsync(userUuid, userUuid);
+  }
 
-    createTwofactor<T>(user: Item, twofactor: Twofactor<T>): Promise<Item> {
-        const userUuid = user.get(UserRepository.PARTITION_KEY);
-        const recoveryCode = !!user.get('recoveryCode') ? user.get('recoveryCode') : encode(crypto.randomBytes(20));
-        let params: any = {};
-        params.UpdateExpression = `SET #twofactors.${twofactor.typeKey} = :twofactor, #recoveryCode = :recoveryCode`;
-        params.ExpressionAttributeNames = {
-            '#twofactors' : 'twofactors',
-            '#recoveryCode': 'recoveryCode'
-        };
-        params.ExpressionAttributeValues = {
-            ':twofactor' : twofactor,
-            ':recoveryCode': recoveryCode
-        };
+  async getUserByEmail(email: string): Promise<Item> {
+    const [user] = (await User.query(email.toLowerCase())
+      .usingIndex('UserEmailIndex')
+      .execAsync()).Items;
+    return user;
+  }
 
-        return User.updateAsync({
-            pk: userUuid,
-            sk: userUuid,
-        }, params);
-    }
+  createTwofactor<T>(user: Item, twofactor: Twofactor<T>): Promise<Item> {
+    const userUuid = user.get(UserRepository.PARTITION_KEY);
+    const recoveryCode = user.get('recoveryCode') ? user.get('recoveryCode') : encode(crypto.randomBytes(20));
+    const params: UpdateItemOptions = {};
+    params.UpdateExpression = `SET #twofactors.${twofactor.typeKey} = :twofactor, #recoveryCode = :recoveryCode`;
+    params.ExpressionAttributeNames = {
+      '#twofactors': 'twofactors',
+      '#recoveryCode': 'recoveryCode',
+    };
+    params.ExpressionAttributeValues = {
+      ':twofactor': twofactor,
+      ':recoveryCode': recoveryCode,
+    };
 
-    removeTwofactorByType(user: Item, type: TwoFactorTypeKey): Promise<Item> {
-        const userUuid = user.get(UserRepository.PARTITION_KEY);
-        let params: any = {};
-        params.UpdateExpression = `REMOVE twofactors.${type}`;
+    return User.updateAsync({
+      pk: userUuid,
+      sk: userUuid,
+    }, params);
+  }
 
-        return User.updateAsync({
-            pk: userUuid,
-            sk: userUuid,
-        }, params);
-    }
+  removeTwofactorByType(user: Item, type: TwoFactorTypeKey): Promise<Item> {
+    const userUuid = user.get(UserRepository.PARTITION_KEY);
+    const params: UpdateItemOptions = {};
+    params.UpdateExpression = `REMOVE twofactors.${type}`;
 
-    deleteAllTwofactors(userUuid: string): Promise<Item> {
-        return User.updateAsync({
-            pk: userUuid,
-            sk: userUuid,
-            twofactors: {},
-            recoveryCode: null
-        });
-    }
+    return User.updateAsync({
+      pk: userUuid,
+      sk: userUuid,
+    }, params);
+  }
 
+  deleteAllTwofactors(userUuid: string): Promise<Item> {
+    return User.updateAsync({
+      pk: userUuid,
+      sk: userUuid,
+      twofactors: {},
+      recoveryCode: null,
+    });
+  }
+
+  private generateSecret(): string {
+    return crypto.randomBytes(64).toString('hex');
+  }
 }
 
 export const userRepository = new UserRepository();

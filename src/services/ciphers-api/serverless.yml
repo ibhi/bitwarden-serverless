@@ -76,11 +76,11 @@ functions:
           method: get
           <<: *default_cors
           path: api/ciphers/{uuid}/attachment/{attachmentId}
-  import:
-    handler: import.postHandler
-    timeout: 30
-    events:
-      - http:
-          method: post
-          <<: *default_cors
-          path: api/ciphers/import
+  # import:
+  #   handler: import.postHandler
+  #   timeout: 30
+  #   events:
+  #     - http:
+  #         method: post
+  #         <<: *default_cors
+  #         path: api/ciphers/import

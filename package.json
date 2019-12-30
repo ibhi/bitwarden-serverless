@@ -4,7 +4,7 @@
   "description": "",
   "main": "webpack.config.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "lint": "eslint . --ext .ts,.tsx"
   },
   "author": "Mohamed Ibrahim Sabibullah",
   "license": "MIT",
@@ -34,12 +34,17 @@
     "@types/node": "^12.12.15",
     "@types/speakeasy": "^2.0.5",
     "@types/uuid": "^3.4.6",
+    "@typescript-eslint/eslint-plugin": "^2.13.0",
+    "@typescript-eslint/parser": "^2.13.0",
     "cache-loader": "^4.1.0",
     "chakram": "^1.5.0",
     "cross-env": "^6.0.3",
     "eslint": "^5.16.0",
     "eslint-config-airbnb-base": "^13.1.0",
-    "eslint-plugin-import": "^2.17.2",
+    "eslint-config-airbnb-typescript": "^6.3.1",
+    "eslint-loader": "^3.0.3",
+    "eslint-plugin-import": "^2.19.1",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
     "fork-ts-checker-webpack-plugin": "^3.1.1",
     "get-stdin": "^7.0.0",
     "istanbul-instrumenter-loader": "^3.0.1",

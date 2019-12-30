@@ -3,14 +3,14 @@ import crypto from 'crypto';
 import bufferEq from 'buffer-equal-constant-time';
 import entries from 'object.entries';
 import mapKeys from 'lodash/mapKeys';
+import { v4 as uuidV4 } from 'uuid';
+import { Item } from 'dynogels';
 import {
-  CIPHER_MODEL_VERSION, USER_MODEL_VERSION,
+  CIPHER_MODEL_VERSION,
 } from '../db/models';
-import { KDF_PBKDF2_ITERATIONS_DEFAULT } from './crypto';
 import { userRepository } from '../db/user-repository';
 import { deviceRepository, DeviceRepository } from '../db/device-repository';
-import { CipherRepository, AttachmentDocument } from '../db/cipher-repository';
-import { v4 as uuidV4 } from 'uuid';
+import { CipherRepository, AttachmentDocument, CipherDocument } from '../db/cipher-repository';
 
 // Types
 
@@ -35,17 +35,24 @@ interface JwtPayload {
   amr: string[];
 }
 
+export interface Context {
+  user: Item;
+  device: Item;
+}
+
 const JWT_DEFAULT_ALGORITHM = 'HS256';
 
 export const TYPE_LOGIN = 1;
 export const TYPE_NOTE = 2;
 export const TYPE_CARD = 3;
 export const TYPE_IDENTITY = 4;
-
-
 export const DEFAULT_VALIDITY = 60 * 60;
 
-export async function loadContextFromHeader(header) {
+function ucfirst(string): string {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+export async function loadContextFromHeader(header): Promise<Context> {
   if (!header) {
     throw new Error('Missing Authorization header');
   }
@@ -71,7 +78,15 @@ export async function loadContextFromHeader(header) {
   return { user, device };
 }
 
-export function regenerateTokens(user, device) {
+function generateToken(): string {
+  return crypto.randomBytes(64)
+    .toString('base64')
+    .replace(/\+/g, '-') // Convert '+' to '-'
+    .replace(/\//g, '_') // Convert '/' to '_'
+    .replace(/=+$/, ''); // Remove ending '='
+}
+
+export function regenerateTokens(user, device): Tokens {
   const expiryDate = new Date();
   expiryDate.setTime(expiryDate.getTime() + (DEFAULT_VALIDITY * 1000));
 
@@ -81,7 +96,7 @@ export function regenerateTokens(user, device) {
   const tokens: Tokens = {
     tokenExpiresAt: expiryDate,
     refreshToken: device.get('refreshToken'),
-    accessToken: undefined
+    accessToken: undefined,
   };
 
   if (!device.get('refreshToken')) {
@@ -109,14 +124,14 @@ export function regenerateTokens(user, device) {
   return tokens;
 }
 
-export function hashesMatch(hashA, hashB) {
+export function hashesMatch(hashA, hashB): boolean {
   return hashA && hashB && bufferEq(Buffer.from(hashA), Buffer.from(hashB));
 }
 
-export function buildCipherDocument(body, user, cipherId) {
+export function buildCipherDocument(body, user: Item, cipherId: string | null): CipherDocument {
   const params = {
-    pk: user.get('pk'),
-    sk: cipherId ? cipherId :`${CipherRepository.CIPHER_PREFIX}${uuidV4()}`,
+    pk: user.get('pk') as string,
+    sk: cipherId || `${CipherRepository.CIPHER_PREFIX}${uuidV4()}`,
     organizationUuid: body.organizationid,
     folderUuid: body.folderid,
     favorite: !!body.favorite,
@@ -143,7 +158,7 @@ export function buildCipherDocument(body, user, cipherId) {
     entries(body[additionalParamsType]).forEach(([key, value]) => {
       let paramValue = value;
       if (ucfirst(key) === 'Uris' && value) {
-        paramValue = value.map(val => mapKeys(val, (_, uriKey) => ucfirst(uriKey)));
+        paramValue = value.map((val) => mapKeys(val, (_, uriKey) => ucfirst(uriKey)));
       }
       params[additionalParamsType][ucfirst(key)] = paramValue;
     });
@@ -163,21 +178,6 @@ export function buildCipherDocument(body, user, cipherId) {
   return params;
 }
 
-export function buildUserDocument(body) {
-  return {
-    email: body.email.toLowerCase(),
-    passwordHash: body.masterpasswordhash,
-    passwordHint: body.masterpasswordhint,
-    kdfIterations: body.kdfiterations || KDF_PBKDF2_ITERATIONS_DEFAULT,
-    key: body.key,
-    jwtSecret: generateSecret(),
-    culture: 'en-US', // Hard-coded unless supplied from elsewhere
-    premium: true,
-    emailVerified: true, // Web-vault requires verified e-mail
-    version: USER_MODEL_VERSION,
-  };
-}
-
 export function buildAttachmentDocument(attachment, attachmentKey): AttachmentDocument {
   return {
     uuid: attachment.id,
@@ -187,23 +187,7 @@ export function buildAttachmentDocument(attachment, attachmentKey): AttachmentDo
   };
 }
 
-export function generateSecret() {
-  return crypto.randomBytes(64).toString('hex');
-}
-
-export async function touch(object) {
+export async function touch(object: Item): Promise<void> {
   object.set({ updatedAt: new Date().toISOString() });
   await object.updateAsync();
-}
-
-function generateToken() {
-  return crypto.randomBytes(64)
-    .toString('base64')
-    .replace(/\+/g, '-') // Convert '+' to '-'
-    .replace(/\//g, '_') // Convert '/' to '_'
-    .replace(/=+$/, ''); // Remove ending '='
-}
-
-function ucfirst(string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
 }
