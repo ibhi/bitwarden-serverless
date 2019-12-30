@@ -55,7 +55,7 @@ module.exports = (path, nodeExternals, slsw, ForkTsCheckerWebpackPlugin, isLocal
       },
     ]
   },
-  // plugins: [new ForkTsCheckerWebpackPlugin({
-  //   tsconfig: '../../tsconfig.json',
-  // })]
+  plugins: [new ForkTsCheckerWebpackPlugin({
+    tsconfig: '../../../tsconfig.json',
+  })]
 });

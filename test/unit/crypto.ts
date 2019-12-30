@@ -1,7 +1,7 @@
 // Thanks to bitwarden-ruby for the test cases
 import { expect } from 'chai';
 import crypto from 'crypto';
-import * as bitwardenCrypto from '../../libs/lib/crypto';
+import * as bitwardenCrypto from '../../src/libs/lib/crypto';
 
 describe('Bitwarden cipher format', function() {
   it('should make a key from a password and salt', async function() {

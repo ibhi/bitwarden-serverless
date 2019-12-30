@@ -8,7 +8,8 @@ custom:
       - 'multipart/form-data'
   webpack:
     webpackConfig: 'webpack.config.js'
-    includeModules: true
+    includeModules:
+      packagePath: '../../../package.json'
     # keepOutputDirectory: true
   dynamodb:
   # If you only want to use DynamoDB Local in some stages, declare them here

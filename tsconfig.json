@@ -1,10 +1,17 @@
 {
     "compilerOptions": {
+        "baseUrl": ".",
         "preserveConstEnums": true,
         "strictNullChecks": true,
         "inlineSources": true,
         "inlineSourceMap": true,
-        "sourceRoot": "/",
+        "paths": {
+            "*": [
+                "node_modules/*",
+                "src/typings/*"
+            ]
+        },
+        "sourceRoot": "./",
         "target": "es2017",
         "outDir": ".build",
         "module": "commonjs",

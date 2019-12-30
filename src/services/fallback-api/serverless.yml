@@ -1,0 +1,33 @@
+service: 
+  name: bitwarden-fallback-api
+
+plugins:
+  - serverless-webpack
+
+custom: ${file(../../../serverless.common.yml):custom}
+
+provider:
+  name: aws
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs10.x
+  memorySize: 256
+  timeout: 10
+  environment: ${file(../../../serverless.common.yml):environment}
+  apiGateway:
+    restApiId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiId
+    restApiRootResourceId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiRootResourceId
+
+default_cors: &default_cors
+  cors: ${file(../../../serverless.common.yml):cors}
+
+functions:
+  default:
+    handler: default.handler
+    events:
+      - http:
+          method: any
+          <<: *default_cors
+          path: /{fallback+}

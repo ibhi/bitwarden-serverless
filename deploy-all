@@ -25,19 +25,19 @@ const extResourcesPath = path.resolve(__dirname, 'ext-resources');
 const deployExtResources = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 
   deployWithPromise(stage, region, extResourcesPath);
 
-const accountsApiPath = path.resolve(__dirname, 'services/accounts-api');
+const accountsApiPath = path.resolve(__dirname, 'src/services/accounts-api');
 const deployAccountsApi = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 
 deployWithPromise(stage, region, accountsApiPath);
 
 
 const services = [
-    { path: path.resolve(__dirname, "services/ciphers-api") },
-    { path: path.resolve(__dirname, "services/fallback-api") },
-    { path: path.resolve(__dirname, "services/folders-api") },
-    { path: path.resolve(__dirname, "services/icons-api") },
-    { path: path.resolve(__dirname, "services/login-api") },
-    { path: path.resolve(__dirname, "services/sync-api") },
-    { path: path.resolve(__dirname, "services/twofactor-api") },
+    { path: path.resolve(__dirname, "src/services/ciphers-api") },
+    { path: path.resolve(__dirname, "src/services/fallback-api") },
+    { path: path.resolve(__dirname, "src/services/folders-api") },
+    { path: path.resolve(__dirname, "src/services/icons-api") },
+    { path: path.resolve(__dirname, "src/services/login-api") },
+    { path: path.resolve(__dirname, "src/services/sync-api") },
+    { path: path.resolve(__dirname, "src/services/twofactor-api") },
 ];
 
 const deployOtherApis = (stage = DEFAULT_STAGE, region = DEFAULT_REGION) => 

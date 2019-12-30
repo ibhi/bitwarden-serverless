@@ -1,0 +1,55 @@
+service: 
+  name: bitwarden-folders-api
+
+plugins:
+  - serverless-webpack
+
+custom: ${file(../../../serverless.common.yml):custom}
+
+provider:
+  name: aws
+  region: eu-central-1
+  stage: ${opt:stage, 'dev'}
+  runtime: nodejs10.x
+  memorySize: 256
+  timeout: 10
+  environment: ${file(../../../serverless.common.yml):environment}
+  apiGateway:
+    restApiId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiId
+    restApiRootResourceId:
+      'Fn::ImportValue': ${self:provider.stage}-ExtApiGatewayRestApiRootResourceId
+    restApiResources:
+      '/api': 
+        Fn::ImportValue: 
+          ${self:provider.stage}-ExtApiGatewayRestApiResourceApiId
+
+  iamRoleStatements:
+    - ${file(../../../serverless.common.yml):dynamodbRoleStatement}
+
+default_cors: &default_cors
+  cors: ${file(../../../serverless.common.yml):cors}
+
+functions:
+  # Folder endpoints
+  folder_post:
+    handler: folders.postHandler
+    events:
+      - http:
+          method: post
+          <<: *default_cors
+          path: api/folders
+  folder_put:
+    handler: folders.putHandler
+    events:
+      - http:
+          method: put
+          <<: *default_cors
+          path: api/folders/{uuid}
+  folder_delete:
+    handler: folders.deleteHandler
+    events:
+      - http:
+          method: delete
+          <<: *default_cors
+          path: api/folders/{uuid}

@@ -1,10 +1,8 @@
-import { UserRepository } from '../../libs/db/user-repository';
-import { User } from '../../libs/db/models';
+import { userRepository } from '../../src/libs/db/user-repository';
+import { User } from '../../src/libs/db/models';
 import { v4 as uuidV4 } from 'uuid';
 import { expect } from 'chai';
 import * as AWS from 'aws-sdk';
-const userRepository = new UserRepository();
-// const AWS = require('aws-sdk');
 
 const config = {
     endpoint: 'http://localhost:8000',
