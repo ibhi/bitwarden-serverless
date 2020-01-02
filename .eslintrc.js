@@ -16,7 +16,7 @@ module.exports = {
         'no-console': ['off'],
         'class-methods-use-this': ['off'],
         'import/prefer-default-export': ['off'],
-        '@typescript-eslint/no-explicit-any': ['off'],
+        // '@typescript-eslint/no-explicit-any': ['off'],
         // 'no-use-before-define': ['off'],
         // 'prefer-template': ['off'],
         // 'no-loop-func': ['off']
