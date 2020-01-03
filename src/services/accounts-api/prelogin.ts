@@ -1,31 +1,36 @@
+import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { KDF_PBKDF2, KDF_PBKDF2_ITERATIONS_DEFAULT } from '../../libs/lib/crypto';
-import * as utils from '../../libs/lib/api_utils';
 import { userRepository } from '../../libs/db/user-repository';
+import BaseLambda from '../../libs/base-lambda';
+import { deviceRepository } from '../../libs/db/device-repository';
 
-// eslint-disable-next-line
-export const handler = async (event, context, callback): Promise<void> => {
-  console.log('Prelogin handler triggered', JSON.stringify(event, null, 2));
 
-  if (!event.body) {
-    callback(null, utils.validationError('Request body is missing'));
-    return;
-  }
+interface RequestBody {
+  email: string;
+}
 
-  const body = utils.normalizeBody(JSON.parse(event.body));
+export class PreloginLambda extends BaseLambda {
+  public handler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Prelogin handler triggered', JSON.stringify(event, null, 2));
 
-  // const [user] = (await User.scan()
-  //   .where('email').equals(body.email.toLowerCase())
-  //   .execAsync())
-  //   .Items;
-  const user = await userRepository.getUserByEmail(body.email);
+    if (!event.body) {
+      return this.validationError('Request body is missing');
+    }
 
-  if (!user) {
-    callback(null, utils.validationError('Unknown username'));
-    return;
-  }
+    const body: RequestBody = this.normalizeBody(JSON.parse(event.body));
 
-  callback(null, utils.okResponse({
-    Kdf: user.get('kdfType') || KDF_PBKDF2,
-    KdfIterations: user.get('kdfIterations') || KDF_PBKDF2_ITERATIONS_DEFAULT,
-  }));
-};
+    const user = await this.userRepository.getUserByEmail(body.email);
+
+    if (!user) {
+      return this.validationError('Unknown username');
+    }
+
+    return this.okResponse({
+      Kdf: user.get('kdfType') || KDF_PBKDF2,
+      KdfIterations: user.get('kdfIterations') || KDF_PBKDF2_ITERATIONS_DEFAULT,
+    });
+  };
+}
+
+export const prelogin = new PreloginLambda(userRepository, deviceRepository);
+export const { handler } = prelogin;

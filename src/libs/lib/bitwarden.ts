@@ -35,7 +35,7 @@ interface JwtPayload {
   amr: string[];
 }
 
-export interface Context {
+export interface UserDeviceContext {
   user: Item;
   device: Item;
 }
@@ -52,7 +52,7 @@ function ucfirst(string): string {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-export async function loadContextFromHeader(header): Promise<Context> {
+export async function loadContextFromHeader(header): Promise<UserDeviceContext> {
   if (!header) {
     throw new Error('Missing Authorization header');
   }

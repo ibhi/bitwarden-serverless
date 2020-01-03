@@ -1,124 +1,141 @@
 import S3 from 'aws-sdk/clients/s3';
-import * as utils from '../../libs/lib/api_utils';
-import { loadContextFromHeader, buildCipherDocument, touch } from '../../libs/lib/bitwarden';
+import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
+import { buildCipherDocument, touch } from '../../libs/lib/bitwarden';
 import { mapCipher } from '../../libs/lib/mappers';
-import { cipherRepository, AttachmentDocument } from '../../libs/db/cipher-repository';
-import { UserRepository } from '../../libs/db/user-repository';
+import {
+  cipherRepository as cipherRepo,
+  AttachmentDocument,
+  CipherRepository,
+} from '../../libs/db/cipher-repository';
+import { UserRepository, userRepository as userRepo } from '../../libs/db/user-repository';
+import BaseLambda from '../../libs/base-lambda';
+import { DeviceRepository, deviceRepository as deviceRepo } from '../../libs/db/device-repository';
 
-const s3 = new S3();
-
-export const postHandler = async (event, context, callback): Promise<void> => {
-  console.log('Cipher create handler triggered', JSON.stringify(event, null, 2));
-
-  if (!event.body) {
-    callback(null, utils.validationError('Request body is missing'));
-    return;
+export class CipherLambda extends BaseLambda {
+  constructor(
+    userRepository: UserRepository,
+    deviceRepository: DeviceRepository,
+    private cipherRepository: CipherRepository,
+    private s3: S3,
+  ) {
+    super(userRepository, deviceRepository);
   }
 
-  const body = utils.normalizeBody(JSON.parse(event.body));
+  postHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Cipher create handler triggered', JSON.stringify(event, null, 2));
 
-  let user;
-  try {
-    ({ user } = await loadContextFromHeader(event.headers.Authorization));
-  } catch (e) {
-    callback(null, utils.validationError(`User not found: ${e.message}`));
-    return;
-  }
-
-  if (!body.type || !body.name) {
-    callback(null, utils.validationError('Missing name and type of vault item'));
-    return;
-  }
-
-  try {
-    const cipher = await cipherRepository.createCipher(buildCipherDocument(body, user, null));
-
-    await touch(user);
-
-    callback(null, utils.okResponse({ ...await mapCipher(cipher), Edit: true }));
-  } catch (e) {
-    callback(null, utils.serverError('Server error saving vault item', e));
-  }
-};
-
-export const putHandler = async (event, context, callback): Promise<void> => {
-  console.log('Cipher edit handler triggered', JSON.stringify(event, null, 2));
-  if (!event.body) {
-    callback(null, utils.validationError('Request body is missing'));
-    return;
-  }
-
-  const body = utils.normalizeBody(JSON.parse(event.body));
-
-  let user;
-  try {
-    ({ user } = await loadContextFromHeader(event.headers.Authorization));
-  } catch (e) {
-    callback(null, utils.validationError(`User not found: ${e.message}`));
-    return;
-  }
-
-  if (!body.type || !body.name) {
-    callback(null, utils.validationError('Missing name and type of vault item'));
-    return;
-  }
-
-  const cipherUuid = event.pathParameters.uuid;
-  if (!cipherUuid) {
-    callback(null, utils.validationError('Missing vault item ID'));
-  }
-
-  try {
-    let cipher = await cipherRepository.getCipherById(user.get('pk'), cipherUuid);
-
-    if (!cipher) {
-      callback(null, utils.validationError('Unknown vault item'));
-      return;
+    if (!event.body) {
+      return this.validationError('Request body is missing');
     }
 
-    cipher.set(buildCipherDocument(body, user, cipherUuid));
+    const body = this.normalizeBody(JSON.parse(event.body));
 
-    cipher = await cipher.updateAsync();
-    await touch(user);
+    let user;
+    try {
+      ({ user } = await this.loadContextFromHeader(event.headers.Authorization));
+    } catch (e) {
+      return this.validationError(`User not found: ${e.message}`);
+    }
 
-    callback(null, utils.okResponse({ ...await mapCipher(cipher), Edit: true }));
-  } catch (e) {
-    callback(null, utils.serverError('Server error saving vault item', e));
-  }
-};
+    if (!body.type || !body.name) {
+      return this.validationError('Missing name and type of vault item');
+    }
 
-export const deleteHandler = async (event, context, callback): Promise<void> => {
-  console.log('Cipher delete handler triggered', JSON.stringify(event, null, 2));
+    try {
+      const cipher = await this.cipherRepository
+        .createCipher(buildCipherDocument(body, user, null));
+      await touch(user);
 
-  let user;
-  try {
-    ({ user } = await loadContextFromHeader(event.headers.Authorization));
-  } catch (e) {
-    callback(null, utils.validationError(`User not found: ${e.message}`));
-  }
+      return this.okResponse({ ...await mapCipher(cipher), Edit: true });
+    } catch (e) {
+      return this.serverError('Server error saving vault item', e);
+    }
+  };
 
-  const cipherUuid = event.pathParameters.uuid;
-  if (!cipherUuid) {
-    callback(null, utils.validationError('Missing vault item ID'));
-  }
+  putHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Cipher edit handler triggered', JSON.stringify(event, null, 2));
+    if (!event.body) {
+      return this.validationError('Request body is missing');
+    }
 
-  try {
-    const attachments: {[key: string]: AttachmentDocument} = (await cipherRepository
-      .getCipherById(user.get(UserRepository.PARTITION_KEY), cipherUuid)
-    ).get('attachments') || {};
-    // Delete all attachments belonging to the cipher from s3 before deleting the cipher
-    await Promise.all(Object.keys(attachments)
-      .map((key) => attachments[key])
-      .map((attachment) => s3.deleteObject({
-        Bucket: process.env.ATTACHMENTS_BUCKET || '',
-        Key: `${cipherUuid}/${attachment.uuid}`,
-      }).promise()));
+    const body = this.normalizeBody(JSON.parse(event.body));
 
-    await cipherRepository.deleteCipherById(user.get('pk'), cipherUuid);
-    await touch(user);
+    let user;
+    try {
+      ({ user } = await this.loadContextFromHeader(event.headers.Authorization));
+    } catch (e) {
+      return this.validationError(`User not found: ${e.message}`);
+    }
 
-    callback(null, utils.okResponse(''));
-  } catch (e) {
-    callback(null, utils.validationError(e.toString()));
-  }
-};
+    if (!body.type || !body.name) {
+      return this.validationError('Missing name and type of vault item');
+    }
+
+
+    if (!event?.pathParameters?.uuid) {
+      return this.validationError('Missing vault item ID');
+    }
+    const cipherUuid = event.pathParameters.uuid;
+
+    try {
+      let cipher = await this.cipherRepository.getCipherById(user.get('pk'), cipherUuid);
+
+      if (!cipher) {
+        return this.validationError('Unknown vault item');
+      }
+
+      cipher.set(buildCipherDocument(body, user, cipherUuid));
+
+      cipher = await cipher.updateAsync();
+      await touch(user);
+
+      return this.okResponse({ ...await mapCipher(cipher), Edit: true });
+    } catch (e) {
+      return this.serverError('Server error saving vault item', e);
+    }
+  };
+
+  deleteHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Cipher delete handler triggered', JSON.stringify(event, null, 2));
+
+    let user;
+    try {
+      ({ user } = await this.loadContextFromHeader(event.headers.Authorization));
+    } catch (e) {
+      return this.validationError(`User not found: ${e.message}`);
+    }
+
+    if (!event?.pathParameters?.uuid) {
+      return this.validationError('Missing vault item ID');
+    }
+    const cipherUuid = event.pathParameters.uuid;
+
+    try {
+      const attachments: { [key: string]: AttachmentDocument } = (await this.cipherRepository
+        .getCipherById(user.get(UserRepository.PARTITION_KEY), cipherUuid)
+      ).get('attachments') || {};
+      // Delete all attachments belonging to the cipher from s3 before deleting the cipher
+      await Promise.all(Object.keys(attachments)
+        .map((key) => attachments[key])
+        .map((attachment) => this.s3.deleteObject({
+          Bucket: process.env.ATTACHMENTS_BUCKET || '',
+          Key: `${cipherUuid}/${attachment.uuid}`,
+        }).promise()));
+
+      await this.cipherRepository.deleteCipherById(user.get('pk'), cipherUuid);
+      await touch(user);
+
+      return this.okResponse('');
+    } catch (e) {
+      return this.validationError(e.toString());
+    }
+  };
+}
+
+export const cipherLambda = new CipherLambda(
+  userRepo,
+  deviceRepo,
+  cipherRepo,
+  new S3(),
+);
+export const { postHandler, putHandler, deleteHandler } = cipherLambda;

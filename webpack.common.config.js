@@ -34,7 +34,7 @@ module.exports = (path, nodeExternals, slsw, ForkTsCheckerWebpackPlugin, isLocal
         ],
         loader: 'eslint-loader',
         options: {
-          cache: true,
+          cache: false,
           fix: true,
           failOnError: true,
         },
