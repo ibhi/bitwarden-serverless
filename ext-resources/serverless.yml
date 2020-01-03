@@ -3,6 +3,13 @@ service:
   deletionPolicy:
       prod: Retain
       other: Delete
+plugins:
+  - serverless-dynamodb-local
+
+custom:
+  dynamodb:
+    stages:
+      - dev
 
 provider:
   name: aws

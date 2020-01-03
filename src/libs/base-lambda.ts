@@ -1,8 +1,13 @@
-import { Item } from 'dynogels';
-import jwt from 'jsonwebtoken';
 import { APIGatewayProxyResult } from 'aws-lambda';
-import { UserRepository } from './db/user-repository';
+import { Item } from 'dynogels';
+import { sequenceS } from 'fp-ts/lib/Apply';
+import * as E from 'fp-ts/lib/Either';
+import { pipe } from 'fp-ts/lib/pipeable';
+import * as TE from 'fp-ts/lib/TaskEither';
+import jwt from 'jsonwebtoken';
+
 import { DeviceRepository } from './db/device-repository';
+import { UserRepository } from './db/user-repository';
 
 export interface UserDeviceContext {
   user: Item;
@@ -35,7 +40,8 @@ export default abstract class BaseLambda {
  */
   public static readonly CORS_HEADERS = {
     'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'Content-Type,Authorization,Accept,Device-type,Pragma,Cache-Control',
+    'access-control-allow-headers':
+      'Content-Type,Authorization,Accept,Device-type,Pragma,Cache-Control',
   };
 
   constructor(
@@ -68,6 +74,48 @@ export default abstract class BaseLambda {
 
     return { user, device };
   }
+
+  protected createTaskEitherFromPromise = <T>(
+    promise: Promise<T>,
+  ): TE.TaskEither<Error, T> => TE.tryCatch(
+    () => promise,
+    E.toError,
+  );
+
+  protected loadContext = (
+    authHeader: string | null | undefined,
+  ): TE.TaskEither<Error, { user: Item; device: Item }> => pipe(
+    authHeader, // string | null | undefined
+    E.fromNullable(new Error('Missing Authorization header')), // Either<Error, NonNullable<string>>
+    E.map((header) => header.replace(/^(Bearer)/, '').trim()), // Either<Error, string>
+    E.map((token) => jwt.decode(token) as JwtPayload), // Either<Error, JwtPayload>
+    E.map((payload) => [payload.sub, payload.device]), // Either<Error, string[]>
+    TE.fromEither, // TaskEither<Error, string[]>
+    TE.map(([userUuid, deviceUuid]) => ({
+      user: this.createTaskEitherFromPromise(
+        this.userRepository.getUserById(userUuid),
+      ),
+      device: this.createTaskEitherFromPromise(
+        this.deviceRepository.getDeviceById(userUuid, deviceUuid),
+      ),
+    })), // TaskEither<Error, { user: TaskEither<Error, Item>, device: TaskEither<Error, Item> }>
+    TE.chain((taskEitherObj) => sequenceS(TE.taskEither)(taskEitherObj)),
+    // TaskEither<Error, { user: Item; device: Item }>
+  );
+
+  private parseJson = <T>(body: string): E.Either<Error, T> => E.tryCatch(
+    () => JSON.parse(body) as T,
+    E.toError,
+  );
+
+  protected parseRequestBody = <T>(
+    bodyJson: string | null | undefined,
+  ): E.Either<Error, T> => pipe(
+    bodyJson,
+    E.fromNullable(new Error('Request body is missing!')),
+    E.chain(this.parseJson),
+    E.map(this.normalizeBody),
+  );
 
   okResponse(body): APIGatewayProxyResult {
     console.log('Success response', { body });
@@ -111,12 +159,12 @@ export default abstract class BaseLambda {
    * The API accepts any case and clients actually send a mix
    * For compatibility, we just use lowercase everywhere
    */
-  normalizeBody(body): any {
+  normalizeBody<T = any>(body): T {
     const normalized = {};
     Object.keys(body).forEach((key) => {
       normalized[key.toLowerCase()] = body[key];
     });
 
-    return normalized;
+    return normalized as T;
   }
 }

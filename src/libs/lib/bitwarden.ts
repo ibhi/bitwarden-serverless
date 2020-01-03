@@ -5,6 +5,11 @@ import entries from 'object.entries';
 import mapKeys from 'lodash/mapKeys';
 import { v4 as uuidV4 } from 'uuid';
 import { Item } from 'dynogels';
+import * as O from 'fp-ts/lib/Option';
+import { pipe } from 'fp-ts/lib/pipeable';
+import * as TE from 'fp-ts/lib/TaskEither';
+import * as E from 'fp-ts/lib/Either';
+import { sequenceS } from 'fp-ts/lib/Apply';
 import {
   CIPHER_MODEL_VERSION,
 } from '../db/models';
@@ -50,6 +55,31 @@ export const DEFAULT_VALIDITY = 60 * 60;
 
 function ucfirst(string): string {
   return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
+function createTaskEitherFromPromise<T>(promise: Promise<T>): TE.TaskEither<Error, T> {
+  return TE.tryCatch(
+    () => promise,
+    E.toError,
+  );
+}
+
+export function loadContext(
+  authHeader: O.Option<string>,
+): TE.TaskEither<Error, { user: Item; device: Item }> {
+  return pipe(
+    authHeader,
+    O.map((header) => header.replace(/^(Bearer)/, '').trim()),
+    E.fromOption(() => new Error('Missing Authorization header')),
+    E.map((token) => jwt.decode(token) as JwtPayload),
+    E.map((payload) => [payload.sub, payload.device]),
+    TE.fromEither,
+    TE.map(([userUuid, deviceUuid]) => ({
+      user: createTaskEitherFromPromise(userRepository.getUserById(userUuid)),
+      device: createTaskEitherFromPromise(deviceRepository.getDeviceById(userUuid, deviceUuid)),
+    })),
+    TE.chain((taskEitherObj) => sequenceS(TE.taskEither)(taskEitherObj)),
+  );
 }
 
 export async function loadContextFromHeader(header): Promise<UserDeviceContext> {

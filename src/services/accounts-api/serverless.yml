@@ -3,6 +3,7 @@ service:
 
 plugins:
   - serverless-webpack
+  - serverless-dynamodb-local
 
 custom: ${file(../../../serverless.common.yml):custom}
 
@@ -30,14 +31,14 @@ functions:
           <<: *default_cors
           path: api/accounts/prelogin
   profile:
-    handler: accounts.profileHandler
+    handler: profile.profileHandler
     events:
       - http:
           method: get
           <<: *default_cors
           path: api/accounts/profile
   profile_put:
-    handler: accounts.putProfileHandler
+    handler: profile.putProfileHandler
     events:
       - http:
           method: put
@@ -60,7 +61,7 @@ functions:
           <<: *default_cors
           path: api/accounts/register
   accounts_revision_date:
-    handler: accounts.revisionDateHandler
+    handler: profile.revisionDateHandler
     events:
       - http:
           method: get

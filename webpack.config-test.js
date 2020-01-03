@@ -2,7 +2,7 @@ var nodeExternals = require('webpack-node-externals');
 const path = require('path');
 // Reference https://zinserjan.github.io/mocha-webpack/docs/guides/code-coverage.html
 module.exports = {
-    // entry: './test/unit/crypto.ts',
+    // entry: './test/unit/user-repository.ts',
     mode: 'production',
     target: 'node', // webpack should compile node compatible code
     externals: [nodeExternals()], // in order to ignore all modules in node_modules folder,
