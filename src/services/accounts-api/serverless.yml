@@ -45,7 +45,7 @@ functions:
           <<: *default_cors
           path: api/accounts/profile
   keys:
-    handler: keys.handler
+    handler: keys/keys.handler
     events:
       - http:
           method: post

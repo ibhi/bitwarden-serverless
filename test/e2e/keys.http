@@ -1,0 +1,33 @@
+# @name prelogin
+POST /dev/api/accounts/prelogin HTTP/1.1
+Host: {{host}}
+Accept: application/json
+Device-Type: 10
+Content-Type: application/json; charset=utf-8
+cache-control: no-cache
+Postman-Token: e6d3e179-7ed4-484b-a941-f7deb00b2a6d
+
+{"email": {{username}}
+
+###
+# @name token
+POST /dev/identity/connect/token HTTP/1.1
+Host: {{host}}
+Accept: application/json
+Content-Type: application/x-www-form-urlencoded; charset=utf-8
+Device-Type: 10
+
+grant_type=password&username={{username}}&password={{masterPassword}}&scope=api%20offline_access&client_id=web&deviceType=10&deviceIdentifier=0ec14833-30a8-4211-9e8d-26886521632c&deviceName=firefox
+###
+
+@authToken = {{token.response.body.$.access_token}}
+@privateKey = {{token.response.body.$.PrivateKey}}
+# @name keys
+POST /{{stage}}/api/accounts/keys HTTP/1.1
+Host: {{host}}
+Content-Type: application/json; charset=utf-8
+Authorization: Bearer {{authToken}}
+
+{
+    "EncryptedPrivateKey": "{{privateKey}}"
+}

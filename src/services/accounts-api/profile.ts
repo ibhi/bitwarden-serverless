@@ -22,7 +22,7 @@ export class ProfileLambda extends BaseLambda {
   profileHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     console.log('Account profile handler triggered', JSON.stringify(event, null, 2));
 
-    const userTaskEither: TE.TaskEither<Error, Item> = pipe(
+    const userTaskEither: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
       event.headers.Authorization,
       this.loadContext,
       TE.map(({ user }) => user),
@@ -32,7 +32,7 @@ export class ProfileLambda extends BaseLambda {
     return userTaskEither().then((either) => pipe(
       either,
       E.fold(
-        (error) => this.serverError(`Error: ${error.message}`, error),
+        (error) => error,
         (user) => this.okResponse(mapUser(user)),
       ),
     ));
@@ -42,13 +42,14 @@ export class ProfileLambda extends BaseLambda {
   putProfileHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     console.log('Update account profile handler triggered', JSON.stringify(event, null, 2));
 
-    const userTaskEither: TE.TaskEither<Error, Item> = pipe(
+    const userTaskEither: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
       event.headers.Authorization,
       this.loadContext,
       TE.map(({ user }) => user),
     );
 
-    const bodyEither: E.Either<Error, PutRequestBody> = this.parseRequestBody(event.body);
+    const bodyEither: E.Either<APIGatewayProxyResult, PutRequestBody> = this
+      .parseJsonRequestBody(event.body);
 
     const setUserDocument = ({ body, user }: {body: PutRequestBody; user: Item}): Item => [
       ['masterpasswordhint', 'passwordHint'], ['name', 'name'], ['culture', 'culture'],
@@ -64,9 +65,9 @@ export class ProfileLambda extends BaseLambda {
       ), user);
 
     const updateUserDocument = (
-      userTE: TE.TaskEither<Error, Item>,
-      bodyE: E.Either<Error, PutRequestBody>,
-    ): TE.TaskEither<Error, Item> => pipe(
+      userTE: TE.TaskEither<APIGatewayProxyResult, Item>,
+      bodyE: E.Either<APIGatewayProxyResult, PutRequestBody>,
+    ): TE.TaskEither<APIGatewayProxyResult, Item> => pipe(
       {
         user: userTE,
         body: TE.fromEither(bodyE),
@@ -77,10 +78,10 @@ export class ProfileLambda extends BaseLambda {
     );
 
     return updateUserDocument(userTaskEither, bodyEither)()
-      .then((userEither: E.Either<Error, Item>) => pipe(
+      .then((userEither: E.Either<APIGatewayProxyResult, Item>) => pipe(
         userEither,
         E.fold(
-          (error) => this.serverError(`Error: ${error.message}`, error),
+          (error) => error,
           (user) => this.okResponse(mapUser(user)),
         ),
       ));
@@ -89,7 +90,7 @@ export class ProfileLambda extends BaseLambda {
   revisionDateHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     console.log('Account revision date handler triggered', JSON.stringify(event, null, 2));
 
-    const getUser: TE.TaskEither<Error, Item> = pipe(
+    const getUser: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
       event.headers.Authorization,
       this.loadContext,
       TE.map(({ user }) => user),
@@ -105,7 +106,7 @@ export class ProfileLambda extends BaseLambda {
     return getUser().then((either) => pipe(
       either,
       E.fold(
-        (error) => this.serverError(`Error: ${error.message}`, error),
+        (error) => error,
         okResponse,
       ),
     ));

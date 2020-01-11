@@ -5,6 +5,7 @@ import * as E from 'fp-ts/lib/Either';
 import { pipe } from 'fp-ts/lib/pipeable';
 import * as TE from 'fp-ts/lib/TaskEither';
 import jwt from 'jsonwebtoken';
+import querystring from 'querystring';
 
 import { DeviceRepository } from './db/device-repository';
 import { UserRepository } from './db/user-repository';
@@ -77,20 +78,24 @@ export default abstract class BaseLambda {
 
   protected createTaskEitherFromPromise = <T>(
     promise: Promise<T>,
-  ): TE.TaskEither<Error, T> => TE.tryCatch(
+  ): TE.TaskEither<APIGatewayProxyResult, T> => TE.tryCatch(
     () => promise,
-    E.toError,
+    (error: Error) => this.serverError(`Something went wrong, Error: ${error.message}`, error),
   );
 
   protected loadContext = (
     authHeader: string | null | undefined,
-  ): TE.TaskEither<Error, { user: Item; device: Item }> => pipe(
+  ): TE.TaskEither<APIGatewayProxyResult, UserDeviceContext> => pipe(
     authHeader, // string | null | undefined
-    E.fromNullable(new Error('Missing Authorization header')), // Either<Error, NonNullable<string>>
-    E.map((header) => header.replace(/^(Bearer)/, '').trim()), // Either<Error, string>
-    E.map((token) => jwt.decode(token) as JwtPayload), // Either<Error, JwtPayload>
-    E.map((payload) => [payload.sub, payload.device]), // Either<Error, string[]>
-    TE.fromEither, // TaskEither<Error, string[]>
+    E.fromNullable(this.validationError('Missing Authorization header')),
+    // Either<APIGatewayProxyResult, NonNullable<string>>
+    E.map((header) => header.replace(/^(Bearer)/, '').trim()),
+    // Either<APIGatewayProxyResult, string>
+    E.map((token) => jwt.decode(token) as JwtPayload),
+    // Either<APIGatewayProxyResult, JwtPayload>
+    E.map((payload) => [payload.sub, payload.device]),
+    // Either<APIGatewayProxyResult, string[]>
+    TE.fromEither, // TaskEither<APIGatewayProxyResult, string[]>
     TE.map(([userUuid, deviceUuid]) => ({
       user: this.createTaskEitherFromPromise(
         this.userRepository.getUserById(userUuid),
@@ -98,22 +103,33 @@ export default abstract class BaseLambda {
       device: this.createTaskEitherFromPromise(
         this.deviceRepository.getDeviceById(userUuid, deviceUuid),
       ),
-    })), // TaskEither<Error, { user: TaskEither<Error, Item>, device: TaskEither<Error, Item> }>
+    })), // TaskEither<Error,
+    // { user: TaskEither<APIGatewayProxyResult, Item>,
+    // device: TaskEither<APIGatewayProxyResult, Item> }>
     TE.chain((taskEitherObj) => sequenceS(TE.taskEither)(taskEitherObj)),
-    // TaskEither<Error, { user: Item; device: Item }>
+    // TaskEither<APIGatewayProxyResult, { user: Item; device: Item }>
   );
 
-  private parseJson = <T>(body: string): E.Either<Error, T> => E.tryCatch(
+  private parseJson = <T>(body: string): E.Either<APIGatewayProxyResult, T> => E.tryCatch(
     () => JSON.parse(body) as T,
-    E.toError,
+    (error: Error) => this.validationError(`Invalid JSON: ${error.message}`),
   );
 
-  protected parseRequestBody = <T>(
+  protected parseJsonRequestBody = <T>(
     bodyJson: string | null | undefined,
-  ): E.Either<Error, T> => pipe(
+  ): E.Either<APIGatewayProxyResult, T> => pipe(
     bodyJson,
-    E.fromNullable(new Error('Request body is missing!')),
+    E.fromNullable(this.validationError('Request body is missing!')),
     E.chain(this.parseJson),
+    E.map(this.normalizeBody),
+  );
+
+  protected parseQueryStringRequestBody = <T>(
+    bodyQuerystring: string | null | undefined,
+  ): E.Either<APIGatewayProxyResult, T> => pipe(
+    bodyQuerystring,
+    E.fromNullable(this.validationError('Request body is missing!')),
+    E.map(querystring.parse),
     E.map(this.normalizeBody),
   );
 

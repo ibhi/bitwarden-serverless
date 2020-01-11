@@ -19,7 +19,7 @@ import { CipherRepository, AttachmentDocument, CipherDocument } from '../db/ciph
 
 // Types
 
-interface Tokens {
+export interface Tokens {
   tokenExpiresAt: Date;
   refreshToken: string;
   accessToken?: string;
