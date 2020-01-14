@@ -8,7 +8,6 @@ import * as TE from 'fp-ts/lib/TaskEither';
 import BaseLambda from '../../../libs/base-lambda';
 import { deviceRepository } from '../../../libs/db/device-repository';
 import { userRepository } from '../../../libs/db/user-repository';
-import { UserDeviceContext } from '../../../libs/lib/bitwarden';
 import { KeysRequestModel } from './keys-request-model';
 import { KeysResponseModel } from './keys-response-model';
 
@@ -33,22 +32,19 @@ export class KeysLambda extends BaseLambda {
       }),
     );
 
-
-    const contextTaskEither: TE.TaskEither<APIGatewayProxyResult, UserDeviceContext> = pipe(
+    const userTaskEither: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
       event.headers.Authorization,
       this.loadContext,
+      TE.map(({ user }) => user),
     );
 
     return pipe(
       {
-        context: contextTaskEither,
+        user: userTaskEither,
         body: TE.fromEither(bodyEither),
       },
       sequenceS(TE.taskEitherSeq),
-      TE.map(({ body, context: { user } }) => {
-        console.log(`Body ${JSON.stringify(body)}`);
-        return body.toUser(user);
-      }),
+      TE.map(({ body, user }) => body.toUser(user)),
       TE.chain((user: Item) => this.createTaskEitherFromPromise(user.updateAsync())),
       TE.map((user: Item) => new KeysResponseModel(user)),
       TE.map(this.okResponse),

@@ -1,10 +1,11 @@
-import { Item, UpdateItemOptions } from 'dynogels';
+import { Item, UpdateItemOptions, ItemCollection } from 'dynogels';
 import { encode } from 'hi-base32';
 import crypto from 'crypto';
 import { v4 as uuidV4 } from 'uuid';
 import { User, USER_MODEL_VERSION } from './models';
 import { TwoFactorTypeKey, Twofactor } from '../../services/twofactor-api/models';
-import { KDF_PBKDF2_ITERATIONS_DEFAULT } from '../lib/crypto';
+import { KDF_PBKDF2_ITERATIONS_DEFAULT, KDF_PBKDF2, KDF_PBKDF2_ITERATIONS_MAX } from '../lib/crypto';
+import { UserKdfInformation } from './user-kdf-information';
 
 export interface UserDocument {
   pk: string;
@@ -73,6 +74,22 @@ export class UserRepository {
       .usingIndex('UserEmailIndex')
       .execAsync()).Items;
     return user;
+  }
+
+  async getKdfInformationByEmail(email: string): Promise<UserKdfInformation> {
+    return User.query(email.toLowerCase())
+      .usingIndex('UserEmailIndex')
+      .execAsync()
+      .then((itemCollection: ItemCollection) => itemCollection.Items[0])
+      .then((user: Item | null | undefined) => {
+        if (!user) {
+          throw new Error('Invalid email');
+        }
+        return {
+          Kdf: user.get('kdfType') || KDF_PBKDF2,
+          KdfIterations: user.get('kdfIterations') || KDF_PBKDF2_ITERATIONS_MAX,
+        };
+      });
   }
 
   createTwofactor<T>(user: Item, twofactor: Twofactor<T>): Promise<Item> {

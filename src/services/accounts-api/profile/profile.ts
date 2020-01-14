@@ -2,24 +2,18 @@ import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { Item } from 'dynogels';
 import { sequenceS } from 'fp-ts/lib/Apply';
 import * as E from 'fp-ts/lib/Either';
-import * as O from 'fp-ts/lib/Option';
 import { pipe } from 'fp-ts/lib/pipeable';
 import * as TE from 'fp-ts/lib/TaskEither';
 
-import BaseLambda from '../../libs/base-lambda';
-import { deviceRepository } from '../../libs/db/device-repository';
-import { userRepository } from '../../libs/db/user-repository';
-import { getRevisionDateAsMillis, mapUser } from '../../libs/lib/mappers';
-
-
-interface PutRequestBody {
-  masterpasswordhint: string;
-  name: string;
-  culture: string;
-}
+import BaseLambda from '../../../libs/base-lambda';
+import { deviceRepository } from '../../../libs/db/device-repository';
+import { userRepository } from '../../../libs/db/user-repository';
+import { getRevisionDateAsMillis } from '../../../libs/lib/mappers';
+import { ProfileResponseModel } from './profile-response-model';
+import { UpdateProfileRequestModel } from './update-profile-request-model';
 
 export class ProfileLambda extends BaseLambda {
-  profileHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+  getHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     console.log('Account profile handler triggered', JSON.stringify(event, null, 2));
 
     const userTaskEither: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
@@ -33,13 +27,12 @@ export class ProfileLambda extends BaseLambda {
       either,
       E.fold(
         (error) => error,
-        (user) => this.okResponse(mapUser(user)),
+        (user) => this.okResponse(new ProfileResponseModel(user)),
       ),
     ));
   };
 
-
-  putProfileHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
+  putHandler = async (event: APIGatewayEvent): Promise<APIGatewayProxyResult> => {
     console.log('Update account profile handler triggered', JSON.stringify(event, null, 2));
 
     const userTaskEither: TE.TaskEither<APIGatewayProxyResult, Item> = pipe(
@@ -48,32 +41,22 @@ export class ProfileLambda extends BaseLambda {
       TE.map(({ user }) => user),
     );
 
-    const bodyEither: E.Either<APIGatewayProxyResult, PutRequestBody> = this
-      .parseJsonRequestBody(event.body);
-
-    const setUserDocument = ({ body, user }: {body: PutRequestBody; user: Item}): Item => [
-      ['masterpasswordhint', 'passwordHint'], ['name', 'name'], ['culture', 'culture'],
-    ]
-      .reduce((usr, [requestAttr, attr]) => pipe(
-        body[requestAttr] as string | null,
-        O.fromNullable,
-        O.map(() => usr.set({ [attr]: body[requestAttr] })),
-        O.fold(
-          () => user,
-          () => usr,
-        ),
-      ), user);
+    const bodyEither: E.Either<APIGatewayProxyResult, UpdateProfileRequestModel> = pipe(
+      this.parseJsonRequestBody<UpdateProfileRequestModel>(event.body),
+      // Parse JSON and assign it to the class instance
+      E.map((body) => Object.assign(new UpdateProfileRequestModel(), body)),
+    );
 
     const updateUserDocument = (
       userTE: TE.TaskEither<APIGatewayProxyResult, Item>,
-      bodyE: E.Either<APIGatewayProxyResult, PutRequestBody>,
+      bodyE: E.Either<APIGatewayProxyResult, UpdateProfileRequestModel>,
     ): TE.TaskEither<APIGatewayProxyResult, Item> => pipe(
       {
         user: userTE,
         body: TE.fromEither(bodyE),
       },
       sequenceS(TE.taskEither),
-      TE.map(setUserDocument),
+      TE.map(({ user, body }) => body.toUser(user)),
       TE.chain((user) => this.createTaskEitherFromPromise(user.updateAsync())),
     );
 
@@ -82,7 +65,7 @@ export class ProfileLambda extends BaseLambda {
         userEither,
         E.fold(
           (error) => error,
-          (user) => this.okResponse(mapUser(user)),
+          (user) => this.okResponse(new ProfileResponseModel(user)),
         ),
       ));
   };
@@ -115,5 +98,5 @@ export class ProfileLambda extends BaseLambda {
 
 export const accounts = new ProfileLambda(userRepository, deviceRepository);
 export const {
-  profileHandler, putProfileHandler, revisionDateHandler,
+  getHandler: profileHandler, putHandler: putProfileHandler, revisionDateHandler,
 } = accounts;

@@ -1,8 +1,8 @@
 import { APIGatewayEvent, APIGatewayProxyResult } from 'aws-lambda';
-import * as utils from '../../libs/lib/api_utils';
-import { userRepository } from '../../libs/db/user-repository';
-import BaseLambda from '../../libs/base-lambda';
-import { deviceRepository } from '../../libs/db/device-repository';
+import * as utils from '../../../libs/lib/api_utils';
+import { userRepository } from '../../../libs/db/user-repository';
+import BaseLambda from '../../../libs/base-lambda';
+import { deviceRepository } from '../../../libs/db/device-repository';
 
 interface RequestBody {
   masterpasswordhash: string;

@@ -24,24 +24,28 @@ default_cors: &default_cors
 functions:
   # Accounts endpoints
   prelogin:
-    handler: prelogin.handler
+    handler: prelogin/prelogin.handler
     events:
       - http:
           method: post
           <<: *default_cors
           path: api/accounts/prelogin
   profile:
-    handler: profile.profileHandler
+    handler: profile/profile.getHandler
     events:
       - http:
           method: get
           <<: *default_cors
           path: api/accounts/profile
   profile_put:
-    handler: profile.putProfileHandler
+    handler: profile/profile.putHandler
     events:
       - http:
           method: put
+          <<: *default_cors
+          path: api/accounts/profile
+      - http:
+          method: post
           <<: *default_cors
           path: api/accounts/profile
   keys:
@@ -61,7 +65,7 @@ functions:
           <<: *default_cors
           path: api/accounts/register
   accounts_revision_date:
-    handler: profile.revisionDateHandler
+    handler: profile/profile.revisionDateHandler
     events:
       - http:
           method: get
